@@ -1,5 +1,7 @@
 package com.tally.config;
 
+import com.tally.account.AppUser;
+import com.tally.account.AppUserRepository;
 import com.tally.domain.Category;
 import com.tally.domain.Expense.ExpenseDetails;
 import com.tally.domain.ExpenseGroup;
@@ -10,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,8 +21,14 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Fills an empty database with two example groups so the app has something to show on first run.
+ * Creates two demo accounts and two example groups so the app has something to show on first run.
  * Enabled with {@code tally.demo-data.enabled=true} (on by default in the dev profile only).
+ *
+ * <ul>
+ *   <li>{@value #ANA_EMAIL} is in both groups.</li>
+ *   <li>{@value #BEN_EMAIL} is only in "Lisbon weekend", which shows that people only see their own groups.</li>
+ * </ul>
+ * Both use the password {@value #PASSWORD}. Never enable this on a public server.
  */
 @Component
 @ConditionalOnProperty(name = "tally.demo-data.enabled", havingValue = "true")
@@ -27,28 +36,42 @@ public class DemoDataLoader implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DemoDataLoader.class);
 
-    private final ExpenseGroupRepository groups;
+    static final String ANA_EMAIL = "ana@example.com";
+    static final String BEN_EMAIL = "ben@example.com";
+    static final String PASSWORD = "tally-demo";
 
-    public DemoDataLoader(ExpenseGroupRepository groups) {
+    private final ExpenseGroupRepository groups;
+    private final AppUserRepository users;
+    private final PasswordEncoder passwordEncoder;
+
+    public DemoDataLoader(ExpenseGroupRepository groups, AppUserRepository users, PasswordEncoder passwordEncoder) {
         this.groups = groups;
+        this.users = users;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (groups.count() > 0) {
+        if (users.existsByEmail(ANA_EMAIL)) {
             return;
         }
-        createFlat();
-        createTrip();
-        log.info("Loaded demo data: 2 groups");
+        AppUser ana = createUser(ANA_EMAIL, "Ana");
+        AppUser ben = createUser(BEN_EMAIL, "Ben");
+        createFlat(ana);
+        createTrip(ana, ben);
+        log.info("Loaded demo data: 2 groups. Log in as {} or {} with password '{}'", ANA_EMAIL, BEN_EMAIL, PASSWORD);
     }
 
-    private void createTrip() {
+    private AppUser createUser(String email, String name) {
+        return users.save(new AppUser(email, name, passwordEncoder.encode(PASSWORD)));
+    }
+
+    private void createTrip(AppUser anaUser, AppUser benUser) {
         ExpenseGroup trip = groups.saveAndFlush(
                 new ExpenseGroup("Lisbon weekend", "Four friends, three days, too many pastéis de nata", "EUR"));
-        Member ana = trip.addMember("Ana");
-        Member ben = trip.addMember("Ben");
+        Member ana = trip.addMember("Ana", anaUser);
+        Member ben = trip.addMember("Ben", benUser);
         Member carla = trip.addMember("Carla");
         Member dani = trip.addMember("Dani");
         groups.flush();
@@ -64,16 +87,16 @@ public class DemoDataLoader implements ApplicationRunner {
         add(trip, "Supermarket breakfast run", "31.45", Category.GROCERIES, start.plusDays(2), dani, all);
     }
 
-    private void createFlat() {
+    private void createFlat(AppUser anaUser) {
         ExpenseGroup flat = groups.saveAndFlush(new ExpenseGroup("Flat 3B", "Shared bills and groceries", "EUR"));
-        Member maya = flat.addMember("Maya");
+        Member ana = flat.addMember("Ana", anaUser);
         Member leo = flat.addMember("Leo");
         Member sam = flat.addMember("Sam");
         groups.flush();
 
         LocalDate today = LocalDate.now();
-        List<Member> all = List.of(maya, leo, sam);
-        add(flat, "Electricity bill", "87.30", Category.UTILITIES, today.minusDays(20), maya, all);
+        List<Member> all = List.of(ana, leo, sam);
+        add(flat, "Electricity bill", "87.30", Category.UTILITIES, today.minusDays(20), ana, all);
         add(flat, "Internet", "39.99", Category.UTILITIES, today.minusDays(18), leo, all);
         add(flat, "Weekly groceries", "64.20", Category.GROCERIES, today.minusDays(3), sam, all);
     }

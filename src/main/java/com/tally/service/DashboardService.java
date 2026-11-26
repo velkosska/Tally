@@ -37,8 +37,8 @@ public class DashboardService {
         this.groups = groups;
     }
 
-    public GroupDashboard dashboard(long groupId) {
-        ExpenseGroup group = groups.getOrThrow(groupId);
+    public GroupDashboard dashboard(long userId, long groupId) {
+        ExpenseGroup group = groups.getForUser(groupId, userId);
         List<Member> members = group.getMembers();
         List<Expense> expenses = group.getExpenses();
         Map<Long, String> names = members.stream().collect(Collectors.toMap(Member::getId, Member::getName));
@@ -66,7 +66,7 @@ public class DashboardService {
     private static List<MemberOption> memberOptions(List<Member> members, List<Expense> expenses) {
         return members.stream()
                 .map(m -> new MemberOption(m.getId(), m.getName(),
-                        expenses.stream().noneMatch(e -> e.involves(m))))
+                        !m.hasAccount() && expenses.stream().noneMatch(e -> e.involves(m))))
                 .toList();
     }
 

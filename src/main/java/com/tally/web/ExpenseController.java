@@ -5,7 +5,9 @@ import com.tally.domain.Category;
 import com.tally.service.ExpenseService;
 import com.tally.service.view.ExpenseFormPage;
 import com.tally.web.form.ExpenseForm;
+import com.tally.security.TallyUser;
 import jakarta.validation.Valid;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -29,8 +31,8 @@ public class ExpenseController {
     }
 
     @ModelAttribute("page")
-    ExpenseFormPage page(@PathVariable long groupId) {
-        return expenseService.formPage(groupId);
+    ExpenseFormPage page(@AuthenticationPrincipal TallyUser user, @PathVariable long groupId) {
+        return expenseService.formPage(user.id(), groupId);
     }
 
     @ModelAttribute("categories")
@@ -50,13 +52,14 @@ public class ExpenseController {
     }
 
     @PostMapping
-    public String create(@PathVariable long groupId, @Valid @ModelAttribute("expenseForm") ExpenseForm form,
+    public String create(@AuthenticationPrincipal TallyUser user,
+                         @PathVariable long groupId, @Valid @ModelAttribute("expenseForm") ExpenseForm form,
                          BindingResult errors, RedirectAttributes redirect) {
         if (errors.hasErrors()) {
             return FORM_VIEW;
         }
         try {
-            expenseService.create(groupId, form.toCommand());
+            expenseService.create(user.id(), groupId, form.toCommand());
         } catch (BusinessRuleException e) {
             errors.reject("businessRule", e.getMessage());
             return FORM_VIEW;
@@ -66,14 +69,16 @@ public class ExpenseController {
     }
 
     @GetMapping("/{expenseId}/edit")
-    public String edit(@PathVariable long groupId, @PathVariable long expenseId, Model model) {
+    public String edit(@AuthenticationPrincipal TallyUser user,
+                       @PathVariable long groupId, @PathVariable long expenseId, Model model) {
         model.addAttribute("expenseId", expenseId);
-        model.addAttribute("expenseForm", ExpenseForm.from(expenseService.details(groupId, expenseId)));
+        model.addAttribute("expenseForm", ExpenseForm.from(expenseService.details(user.id(), groupId, expenseId)));
         return FORM_VIEW;
     }
 
     @PostMapping("/{expenseId}")
-    public String update(@PathVariable long groupId, @PathVariable long expenseId,
+    public String update(@AuthenticationPrincipal TallyUser user,
+                         @PathVariable long groupId, @PathVariable long expenseId,
                          @Valid @ModelAttribute("expenseForm") ExpenseForm form, BindingResult errors,
                          Model model, RedirectAttributes redirect) {
         model.addAttribute("expenseId", expenseId);
@@ -81,7 +86,7 @@ public class ExpenseController {
             return FORM_VIEW;
         }
         try {
-            expenseService.update(groupId, expenseId, form.toCommand());
+            expenseService.update(user.id(), groupId, expenseId, form.toCommand());
         } catch (BusinessRuleException e) {
             errors.reject("businessRule", e.getMessage());
             return FORM_VIEW;
@@ -91,8 +96,9 @@ public class ExpenseController {
     }
 
     @PostMapping("/{expenseId}/delete")
-    public String delete(@PathVariable long groupId, @PathVariable long expenseId, RedirectAttributes redirect) {
-        expenseService.delete(groupId, expenseId);
+    public String delete(@AuthenticationPrincipal TallyUser user,
+                         @PathVariable long groupId, @PathVariable long expenseId, RedirectAttributes redirect) {
+        expenseService.delete(user.id(), groupId, expenseId);
         Flash.success(redirect, "Expense deleted.");
         return "redirect:/groups/" + groupId;
     }

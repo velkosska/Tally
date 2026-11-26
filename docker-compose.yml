@@ -30,6 +30,7 @@ services:
       DB_USERNAME: ${DB_USERNAME:-tally}
       DB_PASSWORD: ${DB_PASSWORD:-tally-dev-password}
       DEMO_DATA: ${DEMO_DATA:-true}
+      REMEMBER_ME_KEY: ${REMEMBER_ME_KEY:-local-compose-remember-me-key}
     ports:
       - "8080:8080"
     restart: unless-stopped

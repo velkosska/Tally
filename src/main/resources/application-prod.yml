@@ -13,3 +13,6 @@ spring:
 tally:
   demo-data:
     enabled: ${DEMO_DATA:false}
+  security:
+    # Signs remember-me cookies. Required: the app won't start without it. Use a long random value.
+    remember-me-key: ${REMEMBER_ME_KEY}

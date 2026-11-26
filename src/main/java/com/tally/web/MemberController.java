@@ -3,7 +3,9 @@ package com.tally.web;
 import com.tally.domain.BusinessRuleException;
 import com.tally.service.GroupService;
 import com.tally.web.form.MemberForm;
+import com.tally.security.TallyUser;
 import jakarta.validation.Valid;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -23,13 +25,14 @@ public class MemberController {
     }
 
     @PostMapping
-    public String add(@PathVariable long groupId, @Valid @ModelAttribute MemberForm form,
+    public String add(@AuthenticationPrincipal TallyUser user,
+                      @PathVariable long groupId, @Valid @ModelAttribute MemberForm form,
                       BindingResult errors, RedirectAttributes redirect) {
         if (errors.hasErrors()) {
             Flash.error(redirect, errors.getFieldError("name").getDefaultMessage());
         } else {
             try {
-                groupService.addMember(groupId, form.getName());
+                groupService.addMember(user.id(), groupId, form.getName());
                 Flash.success(redirect, form.getName().strip() + " joined the group.");
             } catch (BusinessRuleException e) {
                 Flash.error(redirect, e.getMessage());
@@ -39,9 +42,10 @@ public class MemberController {
     }
 
     @PostMapping("/{memberId}/delete")
-    public String remove(@PathVariable long groupId, @PathVariable long memberId, RedirectAttributes redirect) {
+    public String remove(@AuthenticationPrincipal TallyUser user,
+                         @PathVariable long groupId, @PathVariable long memberId, RedirectAttributes redirect) {
         try {
-            groupService.removeMember(groupId, memberId);
+            groupService.removeMember(user.id(), groupId, memberId);
             Flash.success(redirect, "Member removed.");
         } catch (BusinessRuleException e) {
             Flash.error(redirect, e.getMessage());

@@ -1,5 +1,6 @@
 package com.tally.domain;
 
+import com.tally.account.AppUser;
 import com.tally.domain.Expense.ExpenseDetails;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -66,21 +67,34 @@ public class ExpenseGroup {
 
     // ---- members ----
 
+    /** Adds someone who only exists as a name in this group (no account). */
     public Member addMember(String memberName) {
+        return addMember(memberName, null);
+    }
+
+    /** Adds a member, optionally linked to a user account so that user can open the group. */
+    public Member addMember(String memberName, AppUser user) {
         String cleanName = memberName.strip();
+        if (user != null && members.stream().anyMatch(m -> m.isLinkedTo(user.getId()))) {
+            throw new BusinessRuleException("You are already a member of this group.");
+        }
         members.stream()
                 .filter(m -> m.getName().equalsIgnoreCase(cleanName))
                 .findFirst()
                 .ifPresent(existing -> {
                     throw new BusinessRuleException(existing.getName() + " is already in this group.");
                 });
-        Member member = new Member(this, cleanName);
+        Member member = new Member(this, cleanName, user);
         members.add(member);
         return member;
     }
 
     public void removeMember(long memberId) {
         Member member = findMember(memberId);
+        if (member.hasAccount()) {
+            throw new BusinessRuleException(member.getName()
+                    + " has an account linked to this group, so they can't be removed.");
+        }
         if (expenses.stream().anyMatch(expense -> expense.involves(member))) {
             throw new BusinessRuleException(member.getName()
                     + " is part of existing expenses. Remove or edit those expenses first.");

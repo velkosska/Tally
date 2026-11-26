@@ -11,3 +11,5 @@ spring:
 tally:
   demo-data:
     enabled: true
+  security:
+    remember-me-key: dev-only-remember-me-key

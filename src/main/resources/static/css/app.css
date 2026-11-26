@@ -189,6 +189,40 @@ a {
     color: var(--ink);
 }
 
+.topbar__account {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-left: 1.25rem;
+    border-left: 1px solid var(--rule);
+}
+
+.topbar__user {
+    color: var(--ink-soft);
+    font-weight: 600;
+}
+
+.topbar__nav > *,
+.topbar__account > * {
+    white-space: nowrap;
+}
+
+@media (max-width: 40rem) {
+    .topbar__nav {
+        gap: 0.9rem;
+    }
+
+    .topbar__user,
+    .topbar__groups {
+        display: none;
+    }
+
+    .topbar__account {
+        padding-left: 0;
+        border-left: 0;
+    }
+}
+
 /* ---------- Buttons ---------- */
 
 .btn {
@@ -960,6 +994,8 @@ legend {
 }
 
 input[type="text"],
+input[type="email"],
+input[type="password"],
 input[type="number"],
 input[type="date"],
 select {
@@ -1027,6 +1063,37 @@ select:focus-visible {
 .field--error input,
 .field--error select {
     border-color: var(--owes);
+}
+
+/* ---------- Login and sign-up ---------- */
+
+.form__notice {
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    background: var(--owed-tint);
+    color: var(--owed);
+    font-size: var(--step--1);
+    font-weight: 500;
+}
+
+.check {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.check input {
+    width: 1.15rem;
+    height: 1.15rem;
+    accent-color: var(--ink);
+}
+
+.auth-switch {
+    margin-top: 1.25rem;
+    color: var(--ink-soft);
+    text-align: center;
 }
 
 .form__actions {

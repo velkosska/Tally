@@ -10,7 +10,10 @@ JUnit 5 · Testcontainers · Docker · GitHub Actions
 
 ## Features
 
-- **Groups and members**: one group per trip or flat, each with its own currency.
+- **Accounts**: sign up, log in and log out with email and password, with an optional "keep me logged in".
+  Everyone only sees the groups they are a member of.
+- **Groups and members**: one group per trip or flat, each with its own currency. The person who creates a group
+  is its first member; other members can be added by name.
 - **Expenses**: who paid, how much, a category, and who it is split between (equally, to the cent).
 - **Balances**: a diverging bar chart showing who is owed and who owes.
 - **Settle up**: the minimum-payment plan, shown as a receipt.
@@ -32,8 +35,16 @@ mvn spring-boot:run
 
 Open <http://localhost:8080>. Spring Boot's Docker Compose support starts the `db` service from
 `docker-compose.yml`, waits until it is healthy and connects to it, so there is nothing to configure.
-The `dev` profile loads two demo groups into an empty database. Data is kept in the `db-data` Docker volume
-between runs; `docker compose down -v` wipes it.
+The `dev` profile creates two demo accounts, both with the password `tally-demo`:
+
+| Email | Sees |
+|---|---|
+| `ana@example.com` | "Lisbon weekend" and "Flat 3B" |
+| `ben@example.com` | only "Lisbon weekend", which shows that people only see their own groups |
+
+Or create your own account at <http://localhost:8080/signup>. Data is kept in the `db-data` Docker volume
+between runs; `docker compose down -v` wipes it. (Groups created before accounts existed belong to nobody and
+stay hidden, so wipe the volume once after upgrading.)
 
 To look inside the database with a SQL client, find the port Docker picked with `docker compose port db 5432`
 and connect as user `tally`, password `tally-dev-password`, database `tally`.
@@ -81,10 +92,14 @@ the guarantees on 200 random groups every build: everyone ends at exactly zero, 
 ## Architecture
 
 ```
-Browser ──HTTP──▶ web            Controllers, form objects with validation, CSV export
+Browser ──HTTP──▶ security       Spring Security: login, remember-me, CSRF; every page needs a login
                    │
                    ▼
-                  service        Use cases (@Transactional), returns read-only view records
+                  web            Controllers, form objects with validation, CSV export
+                   │
+                   ▼
+                  service        Use cases (@Transactional), returns read-only view records;
+                   │             loads groups only for a user who is a member (the access check)
                    │
           ┌────────┴────────┐
           ▼                 ▼
@@ -98,7 +113,9 @@ Browser ──HTTP──▶ web            Controllers, form objects with valida
 
 ```
 src/main/java/com/tally
-├── domain/        ExpenseGroup (aggregate root), Member, Expense, Category, repository
+├── account/       AppUser, AccountService (sign-up, BCrypt password hashes)
+├── security/      SecurityConfig, TallyUser (the logged-in user), user lookup, login after sign-up
+├── domain/        ExpenseGroup (aggregate root), Member (optionally linked to a user), Expense, Category, repository
 ├── settlement/    BalanceCalculator, SettlementCalculator (the algorithm)
 ├── service/       GroupService, ExpenseService, DashboardService, view/ records
 ├── web/           Controllers, form/ objects, MoneyFormatter, CsvExporter, error handling
@@ -115,6 +132,8 @@ src/main/resources
 |---|---|
 | `ExpenseGroup` is an **aggregate root** | Members and expenses are only changed through the group, so rules such as "the payer must be in the group" and "no duplicate names" are enforced in one place. |
 | **Command and view records** between layers | Services never see web form classes, and templates never see JPA entities. `open-in-view` is off, so lazy-loading bugs can't hide in templates. |
+| **Access checks in the service layer** | Every service method takes the user's id and loads the group with `ExpenseGroupRepository.getForUser`, so no URL can skip the check. A group you aren't in answers 404, the same as one that doesn't exist, so ids can't be probed. |
+| **Remember-me tokens in the database** | "Keep me logged in" uses Spring Security's persistent tokens (`persistent_logins` table): the cookie holds a random token, not the password hash, it rotates on every use and can be revoked. |
 | **Algorithm is framework-free** | `settlement/` is plain Java: fast to unit-test and easy to explain. |
 | **Money in cents / `BigDecimal`** | Floating point can't represent most decimal amounts exactly. |
 | **Flyway + `ddl-auto: validate`** | The schema is versioned SQL, and Hibernate checks that the entities match it at startup. |
@@ -133,7 +152,7 @@ src/main/resources
 - **Docker Compose**: PostgreSQL for local development (started automatically by `mvn spring-boot:run`), plus
   the app container behind the `app` profile, started in the right order using health checks.
 - **Health and metrics** with Spring Boot Actuator: `/actuator/health` (with liveness and readiness probes),
-  `/actuator/info` and `/actuator/metrics`.
+  `/actuator/info` (both public) and `/actuator/metrics` (needs a login).
 - **Dependabot** keeps Maven, Docker and GitHub Actions dependencies up to date.
 - **12-factor config**: no secrets in code; production settings come from environment variables (see `.env.example`).
 - **Graceful shutdown**, so in-flight requests finish before the app stops.
@@ -145,8 +164,10 @@ src/main/resources
 | `BalanceCalculatorTest` | Balances, uneven splits, payers who aren't participants |
 | `SettlementCalculatorTest` | Payment plans, invalid input, and a 200-run randomized property test |
 | `CsvExporterTest` | Quoting and formula-injection escaping |
-| `ExpenseFlowIntegrationTest` | Real services against the real Flyway schema on PostgreSQL (Testcontainers): create, edit, delete, business rules |
+| `ExpenseFlowIntegrationTest` | Real services against the real Flyway schema on PostgreSQL (Testcontainers): create, edit, delete, business rules, users only seeing their own groups |
 | `WebFlowTest` | HTTP requests through MockMvc against PostgreSQL (Testcontainers) that render the real templates: validation errors, 404 page, CSV download, health check |
+| `SecurityFlowTest` | Sign-up (validation, duplicate email, BCrypt hash), login, wrong password, remember-me cookie, logout, CSRF rejection |
+| `AuthorizationWebTest` | Walks every group, expense, member and export URL as a user who isn't in the group: all 404, nothing changes |
 
 ## Deploying
 
@@ -154,12 +175,13 @@ Any host that runs a Docker image works, for example Render, Railway or Fly.io:
 
 1. Create a PostgreSQL database on the host.
 2. Deploy from the `Dockerfile`, and set `DB_URL` (for example `jdbc:postgresql://host:5432/tally`),
-   `DB_USERNAME` and `DB_PASSWORD`. Set `DEMO_DATA=true` to start with example groups.
+   `DB_USERNAME`, `DB_PASSWORD` and `REMEMBER_ME_KEY` (a long random value, e.g. `openssl rand -base64 32`;
+   the app won't start without it). `DEMO_DATA=true` adds the demo accounts, whose password is public, so
+   never set it on a server other people can reach.
 3. Point the host's health check at `/actuator/health`.
 
 ## Ideas for next steps
 
-- User accounts with Spring Security, so each person sees only their own groups
 - Uneven splits (by percentage or exact amounts)
 - Marking a payment as settled, and keeping a history of settlements
 - PDF export of the receipt

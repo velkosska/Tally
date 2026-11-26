@@ -2,3 +2,5 @@
 tally:
   demo-data:
     enabled: false
+  security:
+    remember-me-key: test-only-remember-me-key

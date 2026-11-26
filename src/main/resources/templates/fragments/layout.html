@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 
 <head th:fragment="head(title)">
     <meta charset="UTF-8">
@@ -26,9 +27,17 @@
             </svg>
             <span class="brand__name">Tally</span>
         </a>
-        <nav class="topbar__nav" aria-label="Main">
-            <a th:href="@{/}">Your groups</a>
+        <nav class="topbar__nav" aria-label="Main" sec:authorize="isAuthenticated()">
+            <a class="topbar__groups" th:href="@{/}">Your groups</a>
             <a class="btn btn--small" th:href="@{/groups/new}">New group</a>
+            <form class="topbar__account" method="post" th:action="@{/logout}">
+                <span class="topbar__user" th:text="${#authentication.principal.displayName}">Ana</span>
+                <button class="link-btn" type="submit">Log out</button>
+            </form>
+        </nav>
+        <nav class="topbar__nav" aria-label="Account" sec:authorize="!isAuthenticated()">
+            <a th:href="@{/login}">Log in</a>
+            <a class="btn btn--small" th:href="@{/signup}">Sign up</a>
         </nav>
     </div>
 </header>

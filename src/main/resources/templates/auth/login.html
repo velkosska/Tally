@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Log in')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar}"></header>
+
+<main class="wrap page page--narrow">
+    <h1>Log in</h1>
+    <p class="lead">See your groups, balances and who owes whom.</p>
+
+    <form class="form panel" method="post" th:action="@{/login}" novalidate>
+        <p class="form__error" th:if="${param.error}" role="alert">That email and password don't match an account.</p>
+        <p class="form__notice" th:if="${param.logout}" role="status">You're logged out.</p>
+
+        <div class="field">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="username" required autofocus
+                   maxlength="254" th:value="${param.email}">
+        </div>
+
+        <div class="field">
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+
+        <label class="check">
+            <input type="checkbox" name="remember-me">
+            <span>Keep me logged in on this device for 30 days</span>
+        </label>
+
+        <div class="form__actions">
+            <button class="btn" type="submit">Log in</button>
+        </div>
+    </form>
+
+    <p class="auth-switch">New to Tally? <a th:href="@{/signup}">Create an account</a></p>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>
