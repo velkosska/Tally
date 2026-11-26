@@ -1,12 +1,10 @@
-# Local development: in-memory H2 database, demo data, live template reloads.
+# Local development: PostgreSQL from docker-compose.yml, demo data, live template reloads.
+# `mvn spring-boot:run` starts the `db` service automatically (spring-boot-docker-compose) and
+# connects to it, so no datasource settings are needed here. Docker must be running.
 spring:
-  datasource:
-    url: jdbc:h2:mem:tally;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
-    username: sa
-    password:
-  h2:
-    console:
-      enabled: true
+  docker:
+    compose:
+      file: docker-compose.yml
   thymeleaf:
     cache: false
 

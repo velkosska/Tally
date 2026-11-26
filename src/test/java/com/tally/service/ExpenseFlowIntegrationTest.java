@@ -7,9 +7,11 @@ import com.tally.domain.NotFoundException;
 import com.tally.service.view.GroupDashboard;
 import com.tally.service.view.MemberOption;
 import com.tally.service.view.Payment;
+import com.tally.TestcontainersConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,8 +22,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Runs the real services against the real schema (Flyway on H2) to test whole use cases. */
+/** Runs the real services against the real schema (Flyway on PostgreSQL via Testcontainers) to test whole use cases. */
 @SpringBootTest
+@Import(TestcontainersConfiguration.class)
 @ActiveProfiles("test")
 @Transactional
 class ExpenseFlowIntegrationTest {

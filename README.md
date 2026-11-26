@@ -5,8 +5,8 @@ Split shared costs with friends and settle up in as few payments as possible.
 Log what everyone paid on a trip, in a shared flat or at dinner. Tally keeps a live balance for each
 person and works out the shortest list of payments that gets everyone back to zero.
 
-**Built with:** Java 21 · Spring Boot 3.5 · Thymeleaf · Spring Data JPA · Flyway · H2 / PostgreSQL ·
-JUnit 5 · Docker · GitHub Actions
+**Built with:** Java 21 · Spring Boot 3.5 · Thymeleaf · Spring Data JPA · Flyway · PostgreSQL ·
+JUnit 5 · Testcontainers · Docker · GitHub Actions
 
 ## Features
 
@@ -21,19 +21,27 @@ JUnit 5 · Docker · GitHub Actions
 
 ## Run it
 
-**Option 1: Maven** (needs Java 21 and Maven 3.9+)
+You need **Docker** running for everything below: the app uses PostgreSQL in every environment,
+including local development and tests, so what you test is what runs in production.
+
+**Option 1: Maven** (needs Java 21, Maven 3.9+ and Docker)
 
 ```bash
 mvn spring-boot:run
 ```
 
-Open <http://localhost:8080>. The `dev` profile uses an in-memory H2 database and loads two demo groups.
-The database console is at <http://localhost:8080/h2-console>, with JDBC URL `jdbc:h2:mem:tally` and user `sa`.
+Open <http://localhost:8080>. Spring Boot's Docker Compose support starts the `db` service from
+`docker-compose.yml`, waits until it is healthy and connects to it, so there is nothing to configure.
+The `dev` profile loads two demo groups into an empty database. Data is kept in the `db-data` Docker volume
+between runs; `docker compose down -v` wipes it.
 
-**Option 2: Docker** (runs it like production, with PostgreSQL)
+To look inside the database with a SQL client, find the port Docker picked with `docker compose port db 5432`
+and connect as user `tally`, password `tally-dev-password`, database `tally`.
+
+**Option 2: Docker only** (runs the app in a container too, like production)
 
 ```bash
-docker compose up --build
+docker compose --profile app up --build
 ```
 
 **Run the tests**
@@ -41,6 +49,9 @@ docker compose up --build
 ```bash
 mvn verify          # unit + integration tests, coverage report in target/site/jacoco/index.html
 ```
+
+Integration tests start a throwaway PostgreSQL 17 container with [Testcontainers](https://testcontainers.com),
+run the real Flyway migrations on it and remove it afterwards.
 
 ## How the settle-up algorithm works
 
@@ -82,7 +93,7 @@ Browser ──HTTP──▶ web            Controllers, form objects with valida
    business rules
           │
           ▼
-   PostgreSQL / H2   (schema managed by Flyway migrations)
+   PostgreSQL        (schema managed by Flyway migrations)
 ```
 
 ```
@@ -107,7 +118,8 @@ src/main/resources
 | **Algorithm is framework-free** | `settlement/` is plain Java: fast to unit-test and easy to explain. |
 | **Money in cents / `BigDecimal`** | Floating point can't represent most decimal amounts exactly. |
 | **Flyway + `ddl-auto: validate`** | The schema is versioned SQL, and Hibernate checks that the entities match it at startup. |
-| **Profiles** (`dev`, `test`, `prod`) | H2 and demo data locally; PostgreSQL with credentials from environment variables in production. |
+| **PostgreSQL everywhere** | Dev (Docker Compose), tests (Testcontainers) and production all run the same database, so SQL that works locally works in production. |
+| **Profiles** (`dev`, `test`, `prod`) | Demo data and live template reloads locally; credentials from environment variables in production. |
 | **Constructor injection, `final` fields** | Dependencies are explicit and classes are easy to test. |
 | **Progressive enhancement** | Every page works without JavaScript; JS only adds the chart, a split preview and delete confirmations. |
 | **CSV injection protection** | Cells starting with `=`, `+`, `-` or `@` are escaped so Excel won't run them as formulas. |
@@ -118,7 +130,8 @@ src/main/resources
   coverage reports, then builds the Docker image. See `.github/workflows/ci.yml`.
 - **Docker**: multi-stage build, a layered jar for fast rebuilds, a small JRE image, a non-root user,
   memory-aware JVM settings and a built-in health check.
-- **Docker Compose**: the app plus PostgreSQL, started in the right order using health checks.
+- **Docker Compose**: PostgreSQL for local development (started automatically by `mvn spring-boot:run`), plus
+  the app container behind the `app` profile, started in the right order using health checks.
 - **Health and metrics** with Spring Boot Actuator: `/actuator/health` (with liveness and readiness probes),
   `/actuator/info` and `/actuator/metrics`.
 - **Dependabot** keeps Maven, Docker and GitHub Actions dependencies up to date.
@@ -132,8 +145,8 @@ src/main/resources
 | `BalanceCalculatorTest` | Balances, uneven splits, payers who aren't participants |
 | `SettlementCalculatorTest` | Payment plans, invalid input, and a 200-run randomized property test |
 | `CsvExporterTest` | Quoting and formula-injection escaping |
-| `ExpenseFlowIntegrationTest` | Real services against the real Flyway schema: create, edit, delete, business rules |
-| `WebFlowTest` | HTTP requests through MockMvc that render the real templates: validation errors, 404 page, CSV download, health check |
+| `ExpenseFlowIntegrationTest` | Real services against the real Flyway schema on PostgreSQL (Testcontainers): create, edit, delete, business rules |
+| `WebFlowTest` | HTTP requests through MockMvc against PostgreSQL (Testcontainers) that render the real templates: validation errors, 404 page, CSV download, health check |
 
 ## Deploying
 

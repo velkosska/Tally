@@ -51,8 +51,11 @@ public class GroupService {
         groups.delete(group);
     }
 
-    public void addMember(long groupId, String name) {
-        groups.getOrThrow(groupId).addMember(name);
+    /** Adds a member and returns their id. Flushes so the id exists even before the transaction commits. */
+    public long addMember(long groupId, String name) {
+        Member member = groups.getOrThrow(groupId).addMember(name);
+        groups.flush();
+        return member.getId();
     }
 
     public void removeMember(long groupId, long memberId) {

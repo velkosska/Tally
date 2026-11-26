@@ -1,5 +1,6 @@
-# Runs Tally the way it runs in production: the app container plus PostgreSQL.
-#   docker compose up --build      then open http://localhost:8080
+# PostgreSQL for local development, plus an optional app container that runs Tally like production.
+#   mvn spring-boot:run                       starts only `db` (automatically) and runs the app from source
+#   docker compose --profile app up --build   runs both in containers, then open http://localhost:8080
 services:
   db:
     image: postgres:17-alpine
@@ -7,6 +8,8 @@ services:
       POSTGRES_DB: tally
       POSTGRES_USER: ${DB_USERNAME:-tally}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-tally-dev-password}
+    ports:
+      - "5432"   # random free host port, so it never clashes with a Postgres already on your machine
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
@@ -16,6 +19,7 @@ services:
       retries: 10
 
   app:
+    profiles: [app]   # only started with --profile app
     build: .
     depends_on:
       db:

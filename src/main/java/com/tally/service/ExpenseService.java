@@ -40,9 +40,12 @@ public class ExpenseService {
                 expense.getDate(), expense.getPaidBy().getId(), participantIds);
     }
 
-    public void create(long groupId, ExpenseCommand command) {
+    /** Records an expense and returns its id. Flushes so the id exists even before the transaction commits. */
+    public long create(long groupId, ExpenseCommand command) {
         ExpenseGroup group = groups.getOrThrow(groupId);
-        group.addExpense(toDetails(group, command));
+        Expense expense = group.addExpense(toDetails(group, command));
+        groups.flush();
+        return expense.getId();
     }
 
     public void update(long groupId, long expenseId, ExpenseCommand command) {
