@@ -1,6 +1,8 @@
 package com.tally.config;
 
 import com.tally.account.AppUser;
+import com.tally.activity.ActivityLog;
+import com.tally.activity.ActivityType;
 import com.tally.account.AppUserRepository;
 import com.tally.domain.Category;
 import com.tally.domain.Expense.ExpenseDetails;
@@ -46,11 +48,14 @@ public class DemoDataLoader implements ApplicationRunner {
     private final ExpenseGroupRepository groups;
     private final AppUserRepository users;
     private final PasswordEncoder passwordEncoder;
+    private final ActivityLog activityLog;
 
-    public DemoDataLoader(ExpenseGroupRepository groups, AppUserRepository users, PasswordEncoder passwordEncoder) {
+    public DemoDataLoader(ExpenseGroupRepository groups, AppUserRepository users, PasswordEncoder passwordEncoder,
+                          ActivityLog activityLog) {
         this.groups = groups;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
+        this.activityLog = activityLog;
     }
 
     @Override
@@ -97,6 +102,13 @@ public class DemoDataLoader implements ApplicationRunner {
         add(trip, "Supermarket breakfast run", "31.45", Category.GROCERIES, start.plusDays(2), dani, all);
         trip.recordRepayment(dani.getId(), ana.getId(), new BigDecimal("50.00"), start.plusDays(4),
                 "Bank transfer", null);
+
+        // A few feed entries, so the activity feed isn't empty on first start.
+        activityLog.record(trip, anaUser.getId(), ActivityType.GROUP_CREATED, null);
+        activityLog.record(trip, benUser.getId(), ActivityType.EXPENSE_ADDED, "Pastéis de nata (again)",
+                new BigDecimal("15.60"), "paid by Ben, split equally between Ana, Ben, Carla, Dani");
+        activityLog.record(trip, anaUser.getId(), ActivityType.PAYMENT_RECORDED, "Dani paid Ana",
+                new BigDecimal("50.00"), "Bank transfer");
     }
 
     private void createFlat(AppUser anaUser) {

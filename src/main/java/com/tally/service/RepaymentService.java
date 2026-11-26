@@ -1,5 +1,7 @@
 package com.tally.service;
 
+import com.tally.activity.ActivityLog;
+import com.tally.activity.ActivityType;
 import com.tally.account.AppUser;
 import com.tally.account.AppUserRepository;
 import com.tally.domain.ExpenseGroup;
@@ -15,10 +17,12 @@ public class RepaymentService {
 
     private final ExpenseGroupRepository groups;
     private final AppUserRepository users;
+    private final ActivityLog activityLog;
 
-    public RepaymentService(ExpenseGroupRepository groups, AppUserRepository users) {
+    public RepaymentService(ExpenseGroupRepository groups, AppUserRepository users, ActivityLog activityLog) {
         this.groups = groups;
         this.users = users;
+        this.activityLog = activityLog;
     }
 
     /** Records a payment and returns its id. Flushes so the id exists even before the transaction commits. */
@@ -28,10 +32,20 @@ public class RepaymentService {
         Repayment repayment = group.recordRepayment(command.fromMemberId(), command.toMemberId(),
                 command.amount(), command.date(), command.note(), recordedBy);
         groups.flush();
+        activityLog.record(group, userId, ActivityType.PAYMENT_RECORDED, describe(repayment),
+                repayment.getAmount(), repayment.getNote());
         return repayment.getId();
     }
 
     public void delete(long userId, long groupId, long repaymentId) {
-        groups.getForUser(groupId, userId).removeRepayment(repaymentId);
+        ExpenseGroup group = groups.getForUser(groupId, userId);
+        Repayment repayment = group.findRepayment(repaymentId);
+        activityLog.record(group, userId, ActivityType.PAYMENT_DELETED, describe(repayment),
+                repayment.getAmount(), null);
+        group.removeRepayment(repaymentId);
+    }
+
+    private static String describe(Repayment repayment) {
+        return repayment.getFrom().getName() + " paid " + repayment.getTo().getName();
     }
 }

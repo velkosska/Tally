@@ -1,5 +1,7 @@
 package com.tally.invite;
 
+import com.tally.activity.ActivityLog;
+import com.tally.activity.ActivityType;
 import com.tally.account.AppUser;
 import com.tally.account.AppUserRepository;
 import com.tally.domain.BusinessRuleException;
@@ -37,12 +39,15 @@ public class InviteService {
     private final GroupInviteRepository invites;
     private final ExpenseGroupRepository groups;
     private final AppUserRepository users;
+    private final ActivityLog activityLog;
     private final SecureRandom random = new SecureRandom();
 
-    public InviteService(GroupInviteRepository invites, ExpenseGroupRepository groups, AppUserRepository users) {
+    public InviteService(GroupInviteRepository invites, ExpenseGroupRepository groups, AppUserRepository users,
+                         ActivityLog activityLog) {
         this.invites = invites;
         this.groups = groups;
         this.users = users;
+        this.activityLog = activityLog;
     }
 
     /** Creates a new link for a group the user belongs to and returns its secret token (shown once). */
@@ -53,12 +58,14 @@ public class InviteService {
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         Instant now = Instant.now();
         invites.save(new GroupInvite(group, hash(token), user(userId), now, now.plus(VALIDITY)));
+        activityLog.record(group, userId, ActivityType.INVITE_CREATED, null);
         return token;
     }
 
     /** Switches off every link of the group, for example after one was shared in the wrong chat. */
     public void revokeAll(long userId, long groupId) {
-        groups.getForUser(groupId, userId);
+        ExpenseGroup group = groups.getForUser(groupId, userId);
+        activityLog.record(group, userId, ActivityType.INVITES_REVOKED, null);
         invites.revokeAll(groupId, Instant.now());
     }
 
@@ -93,16 +100,18 @@ public class InviteService {
             return group.getId();
         }
         AppUser user = user(userId);
+        Member joinedAs;
         if (claimMemberId != null) {
-            group.claimMember(claimMemberId, user);
+            joinedAs = group.claimMember(claimMemberId, user);
         } else {
             String name = newName == null || newName.isBlank() ? user.getDisplayName() : newName.strip();
             if (name.length() > MAX_NAME_LENGTH) {
                 throw new BusinessRuleException("Keep your name to " + MAX_NAME_LENGTH + " characters or fewer.");
             }
-            group.addMember(name, user);
+            joinedAs = group.addMember(name, user);
         }
         groups.flush();
+        activityLog.record(group, userId, ActivityType.MEMBER_JOINED, joinedAs.getName());
         return group.getId();
     }
 

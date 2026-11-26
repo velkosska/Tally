@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- One activity list. entries: List<ActivityRow>; showGroup: whether to name the group (home page). -->
+<ol class="activity" th:fragment="list(entries, showGroup)">
+    <li class="activity__entry" th:each="a : ${entries}" th:classappend="'activity__entry--' + ${a.type.tone}">
+        <span class="activity__dot" aria-hidden="true"></span>
+        <span class="activity__text">
+            <strong th:text="${a.who()}">Ana</strong>
+            <span th:text="${a.type.verb}">added</span>
+            <span class="activity__subject" th:if="${a.subject}"
+                  th:text="${a.type.quotesSubject() ? '“' + a.subject + '”' : a.subject}">“Dinner”</span>
+            <span class="amount" th:if="${a.amount}" th:text="${@money.format(a.amount, a.currency)}">€90.00</span>
+            <span class="activity__group" th:if="${showGroup}">
+                in <a th:href="@{/groups/{id}(id=${a.groupId})}" th:text="${a.groupName}">Lisbon weekend</a>
+            </span>
+            <span class="activity__details muted" th:if="${a.details}" th:text="${a.details}">paid by Ana</span>
+        </span>
+        <time class="activity__time muted" th:datetime="${a.at}" th:title="${@when.exact(a.at)}"
+              th:text="${@when.ago(a.at)}">5 min ago</time>
+    </li>
+</ol>
+</body>
+</html>

@@ -85,7 +85,8 @@ class AuthorizationWebTest {
                 "/groups/" + groupId + "/edit",
                 "/groups/" + groupId + "/expenses/new",
                 "/groups/" + groupId + "/expenses/" + expenseId + "/edit",
-                "/groups/" + groupId + "/export.csv")) {
+                "/groups/" + groupId + "/export.csv",
+                "/groups/" + groupId + "/activity")) {
             mvc.perform(get(url).with(user(mallory)))
                     .andExpect(status().isNotFound())
                     .andExpect(content().string(not(containsString("Ana's secret trip"))));

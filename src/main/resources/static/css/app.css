@@ -1309,6 +1309,76 @@ select:focus-visible {
     background: var(--owes-tint);
 }
 
+/* ---------- Activity feed ---------- */
+
+.activity {
+    list-style: none;
+    margin: 0 0 0.75rem;
+    padding: 0;
+}
+
+.activity__entry {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.6rem;
+    align-items: baseline;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--rule);
+    font-size: var(--step--1);
+    line-height: 1.4;
+}
+
+.activity__dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--ink-faint);
+    transform: translateY(-0.1rem);
+}
+
+.activity__entry--added .activity__dot {
+    background: var(--owed);
+}
+
+.activity__entry--removed .activity__dot {
+    background: var(--owes);
+}
+
+.activity__entry--paid .activity__dot {
+    background: var(--marker);
+    box-shadow: 0 0 0 1px var(--ink-faint);
+}
+
+.activity__subject {
+    font-weight: 600;
+}
+
+.activity__details {
+    display: block;
+    margin-top: 0.1rem;
+}
+
+.activity__time {
+    white-space: nowrap;
+    font-size: 0.8rem;
+}
+
+.home-activity {
+    margin-top: 3rem;
+}
+
+.home-activity .activity {
+    margin-top: 1rem;
+}
+
+.pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
 /* ---------- Payments made ---------- */
 
 .repayments {

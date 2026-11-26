@@ -1,5 +1,8 @@
 package com.tally.service;
 
+import com.tally.activity.ActivityLog;
+import com.tally.activity.ActivityType;
+import com.tally.activity.ExpenseSnapshot;
 import com.tally.domain.Expense;
 import com.tally.domain.Expense.ExpenseDetails;
 import com.tally.domain.ExpenseGroup;
@@ -21,9 +24,11 @@ import java.util.Map;
 public class ExpenseService {
 
     private final ExpenseGroupRepository groups;
+    private final ActivityLog activityLog;
 
-    public ExpenseService(ExpenseGroupRepository groups) {
+    public ExpenseService(ExpenseGroupRepository groups, ActivityLog activityLog) {
         this.groups = groups;
+        this.activityLog = activityLog;
     }
 
     @Transactional(readOnly = true)
@@ -52,16 +57,26 @@ public class ExpenseService {
         ExpenseGroup group = groups.getForUser(groupId, userId);
         Expense expense = group.addExpense(toDetails(group, command));
         groups.flush();
+        activityLog.record(group, userId, ActivityType.EXPENSE_ADDED, expense.getDescription(),
+                expense.getAmount(), ExpenseSnapshot.of(expense).summary());
         return expense.getId();
     }
 
     public void update(long userId, long groupId, long expenseId, ExpenseCommand command) {
         ExpenseGroup group = groups.getForUser(groupId, userId);
+        ExpenseSnapshot before = ExpenseSnapshot.of(group.findExpense(expenseId));
         group.updateExpense(expenseId, toDetails(group, command));
+        Expense after = group.findExpense(expenseId);
+        activityLog.record(group, userId, ActivityType.EXPENSE_UPDATED, after.getDescription(),
+                after.getAmount(), before.changesTo(ExpenseSnapshot.of(after)));
     }
 
     public void delete(long userId, long groupId, long expenseId) {
-        groups.getForUser(groupId, userId).removeExpense(expenseId);
+        ExpenseGroup group = groups.getForUser(groupId, userId);
+        Expense expense = group.findExpense(expenseId);
+        activityLog.record(group, userId, ActivityType.EXPENSE_DELETED, expense.getDescription(),
+                expense.getAmount(), "paid by " + expense.getPaidBy().getName());
+        group.removeExpense(expenseId);
     }
 
     private static ExpenseDetails toDetails(ExpenseGroup group, ExpenseCommand command) {

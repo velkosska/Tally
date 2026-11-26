@@ -50,6 +50,11 @@
         </ul>
     </section>
 
+    <section class="home-activity" aria-labelledby="home-activity-heading" th:unless="${activity.isEmpty()}">
+        <h2 id="home-activity-heading">Recent activity</h2>
+        <ol th:replace="~{fragments/activity :: list(${activity}, true)}"></ol>
+    </section>
+
     <section class="friends" aria-labelledby="friends-heading" th:unless="${friends.isEmpty()}">
         <h2 id="friends-heading">People you share groups with</h2>
         <ul class="friends__list">

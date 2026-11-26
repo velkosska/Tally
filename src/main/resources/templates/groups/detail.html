@@ -294,6 +294,14 @@
                     themselves, send them an invite link.</p>
             </section>
 
+            <section class="block block--side" id="activity" aria-labelledby="activity-heading">
+                <h2 id="activity-heading">Recent activity</h2>
+                <p class="empty-inline" th:if="${activity.isEmpty()}">Changes people make will show up here.</p>
+                <ol th:replace="~{fragments/activity :: list(${activity}, false)}"></ol>
+                <a class="link-btn" th:if="${moreActivity}"
+                   th:href="@{/groups/{id}/activity(id=${group.id})}">See all activity</a>
+            </section>
+
             <section class="block block--side" id="invite" aria-labelledby="invite-heading">
                 <h2 id="invite-heading">Invite people</h2>
                 <p class="muted block__hint">Anyone with the link can join after logging in or signing up.

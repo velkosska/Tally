@@ -202,11 +202,14 @@ public class ExpenseGroup {
     }
 
     public void removeRepayment(long repaymentId) {
-        Repayment repayment = repayments.stream()
+        repayments.remove(findRepayment(repaymentId));
+    }
+
+    public Repayment findRepayment(long repaymentId) {
+        return repayments.stream()
                 .filter(r -> r.getId() != null && r.getId() == repaymentId)
                 .findFirst()
                 .orElseThrow(() -> new NotFoundException("Payment", repaymentId));
-        repayments.remove(repayment);
     }
 
     // ---- getters ----

@@ -1,5 +1,7 @@
 package com.tally.service;
 
+import com.tally.activity.ActivityLog;
+import com.tally.activity.ActivityType;
 import com.tally.account.AppUser;
 import com.tally.account.AppUserRepository;
 import com.tally.domain.Expense;
@@ -12,7 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /** Use cases for groups and their members. Every method only sees groups the given user belongs to. */
 @Service
@@ -21,10 +25,12 @@ public class GroupService {
 
     private final ExpenseGroupRepository groups;
     private final AppUserRepository users;
+    private final ActivityLog activityLog;
 
-    public GroupService(ExpenseGroupRepository groups, AppUserRepository users) {
+    public GroupService(ExpenseGroupRepository groups, AppUserRepository users, ActivityLog activityLog) {
         this.groups = groups;
         this.users = users;
+        this.activityLog = activityLog;
     }
 
     @Transactional(readOnly = true)
@@ -54,29 +60,54 @@ public class GroupService {
                 .orElseThrow(() -> new IllegalStateException("User " + userId + " does not exist"));
         ExpenseGroup group = new ExpenseGroup(command.name(), command.description(), command.currency());
         group.addMember(creator.getDisplayName(), creator);
-        return groups.saveAndFlush(group).getId();
+        long id = groups.saveAndFlush(group).getId();
+        activityLog.record(group, userId, ActivityType.GROUP_CREATED, null);
+        return id;
     }
 
     public void update(long userId, long groupId, GroupCommand command) {
-        groups.getForUser(groupId, userId).updateDetails(command.name(), command.description(), command.currency());
+        ExpenseGroup group = groups.getForUser(groupId, userId);
+        List<String> changes = new ArrayList<>();
+        String oldName = group.getName();
+        String oldDescription = group.getDescription();
+        String oldCurrency = group.getCurrency();
+        group.updateDetails(command.name(), command.description(), command.currency());
+        if (!oldName.equals(group.getName())) {
+            changes.add("name " + oldName + " → " + group.getName());
+        }
+        if (!Objects.equals(oldDescription, group.getDescription())) {
+            changes.add("new description");
+        }
+        if (!oldCurrency.equals(group.getCurrency())) {
+            changes.add("currency " + oldCurrency + " → " + group.getCurrency());
+        }
+        if (!changes.isEmpty()) {
+            activityLog.record(group, userId, ActivityType.GROUP_UPDATED, null, null, String.join("; ", changes));
+        }
     }
 
     public void delete(long userId, long groupId) {
         ExpenseGroup group = groups.getForUser(groupId, userId);
         group.removeAllExpenses();
         groups.flush();
-        groups.delete(group);
+        activityLog.deleteForGroup(groupId);
+        groups.deleteById(groupId);
     }
 
     /** Adds a member and returns their id. Flushes so the id exists even before the transaction commits. */
     public long addMember(long userId, long groupId, String name) {
-        Member member = groups.getForUser(groupId, userId).addMember(name);
+        ExpenseGroup group = groups.getForUser(groupId, userId);
+        Member member = group.addMember(name);
         groups.flush();
+        activityLog.record(group, userId, ActivityType.MEMBER_ADDED, member.getName());
         return member.getId();
     }
 
     public void removeMember(long userId, long groupId, long memberId) {
-        groups.getForUser(groupId, userId).removeMember(memberId);
+        ExpenseGroup group = groups.getForUser(groupId, userId);
+        String name = group.findMember(memberId).getName();
+        group.removeMember(memberId);
+        activityLog.record(group, userId, ActivityType.MEMBER_REMOVED, name);
     }
 
     private static GroupCard toCard(ExpenseGroup group) {
