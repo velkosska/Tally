@@ -1,22 +1,29 @@
-# PostgreSQL for local development, plus an optional app container that runs Tally like production.
+# SQL Server for local development, plus an optional app container that runs Tally like production.
 #   mvn spring-boot:run                       starts only `db` (automatically) and runs the app from source
 #   docker compose --profile app up --build   runs both in containers, then open http://localhost:8080
+# Production uses Azure SQL Database, which is the same engine.
 services:
   db:
-    image: postgres:17-alpine
+    image: mcr.microsoft.com/mssql/server:2022-latest   # on Apple Silicon this runs through Rosetta
     environment:
-      POSTGRES_DB: tally
-      POSTGRES_USER: ${DB_USERNAME:-tally}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-tally-dev-password}
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      # SQL Server requires 8+ characters with upper case, lower case and a digit or symbol.
+      MSSQL_SA_PASSWORD: ${DB_PASSWORD:-Tally-dev-Passw0rd}
     ports:
-      - "5432"   # random free host port, so it never clashes with a Postgres already on your machine
+      - "1433"   # random free host port, so it never clashes with anything already on your machine
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - db-data:/var/opt/mssql
+    labels:
+      # Tells Spring Boot's Docker Compose support to connect to the `tally` database, not `master`.
+      org.springframework.boot.jdbc.parameters: databaseName=tally
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d tally"]
+      # Also creates the `tally` database on first start (SQL Server images don't do that themselves).
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -b -Q \"IF DB_ID('tally') IS NULL CREATE DATABASE tally\""]
       interval: 5s
-      timeout: 3s
-      retries: 10
+      timeout: 5s
+      retries: 20
+      start_period: 20s
 
   app:
     profiles: [app]   # only started with --profile app
@@ -26,11 +33,12 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      DB_URL: jdbc:postgresql://db:5432/tally
-      DB_USERNAME: ${DB_USERNAME:-tally}
-      DB_PASSWORD: ${DB_PASSWORD:-tally-dev-password}
+      DB_URL: jdbc:sqlserver://db:1433;databaseName=tally;encrypt=false
+      DB_USERNAME: sa
+      DB_PASSWORD: ${DB_PASSWORD:-Tally-dev-Passw0rd}
       DEMO_DATA: ${DEMO_DATA:-true}
       REMEMBER_ME_KEY: ${REMEMBER_ME_KEY:-local-compose-remember-me-key}
+      SESSION_COOKIE_SECURE: "false"   # plain http://localhost here; production is HTTPS-only
     ports:
       - "8080:8080"
     restart: unless-stopped

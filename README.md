@@ -5,8 +5,8 @@ Split shared costs with friends and settle up in as few payments as possible.
 Log what everyone paid on a trip, in a shared flat or at dinner. Tally keeps a live balance for each
 person and works out the shortest list of payments that gets everyone back to zero.
 
-**Built with:** Java 21 · Spring Boot 3.5 · Thymeleaf · Spring Data JPA · Flyway · PostgreSQL ·
-JUnit 5 · Testcontainers · Docker · GitHub Actions
+**Built with:** Java 21 · Spring Boot 3.5 · Thymeleaf · Spring Data JPA · Flyway · SQL Server / Azure SQL ·
+JUnit 5 · Testcontainers · Docker · GitHub Actions · Azure App Service
 
 ## Features
 
@@ -24,7 +24,7 @@ JUnit 5 · Testcontainers · Docker · GitHub Actions
 
 ## Run it
 
-You need **Docker** running for everything below: the app uses PostgreSQL in every environment,
+You need **Docker** running for everything below: the app uses SQL Server in every environment,
 including local development and tests, so what you test is what runs in production.
 
 **Option 1: Maven** (needs Java 21, Maven 3.9+ and Docker)
@@ -33,7 +33,7 @@ including local development and tests, so what you test is what runs in producti
 mvn spring-boot:run
 ```
 
-Open <http://localhost:8080>. Spring Boot's Docker Compose support starts the `db` service from
+Open <http://localhost:8080>. Spring Boot's Docker Compose support starts the `db` service (SQL Server 2022) from
 `docker-compose.yml`, waits until it is healthy and connects to it, so there is nothing to configure.
 The `dev` profile creates two demo accounts, both with the password `tally-demo`:
 
@@ -46,8 +46,12 @@ Or create your own account at <http://localhost:8080/signup>. Data is kept in th
 between runs; `docker compose down -v` wipes it. (Groups created before accounts existed belong to nobody and
 stay hidden, so wipe the volume once after upgrading.)
 
-To look inside the database with a SQL client, find the port Docker picked with `docker compose port db 5432`
-and connect as user `tally`, password `tally-dev-password`, database `tally`.
+To look inside the database with a SQL client (for example the VS Code "SQL Server (mssql)" extension), find the
+port Docker picked with `docker compose port db 1433` and connect as user `sa`, password `Tally-dev-Passw0rd`,
+database `tally`, with "trust server certificate" on.
+
+On an Apple Silicon Mac the SQL Server image runs through Rosetta: in Docker Desktop, keep **Settings → General →
+Use Rosetta for x86_64/amd64 emulation** switched on. The first start downloads about 1.5 GB.
 
 **Option 2: Docker only** (runs the app in a container too, like production)
 
@@ -61,7 +65,7 @@ docker compose --profile app up --build
 mvn verify          # unit + integration tests, coverage report in target/site/jacoco/index.html
 ```
 
-Integration tests start a throwaway PostgreSQL 17 container with [Testcontainers](https://testcontainers.com),
+Integration tests start a throwaway SQL Server 2022 container with [Testcontainers](https://testcontainers.com),
 run the real Flyway migrations on it and remove it afterwards.
 
 ## How the settle-up algorithm works
@@ -108,7 +112,7 @@ Browser ──HTTP──▶ security       Spring Security: login, remember-me, 
    business rules
           │
           ▼
-   PostgreSQL        (schema managed by Flyway migrations)
+   SQL Server        (Azure SQL Database in production; schema managed by Flyway migrations)
 ```
 
 ```
@@ -137,7 +141,7 @@ src/main/resources
 | **Algorithm is framework-free** | `settlement/` is plain Java: fast to unit-test and easy to explain. |
 | **Money in cents / `BigDecimal`** | Floating point can't represent most decimal amounts exactly. |
 | **Flyway + `ddl-auto: validate`** | The schema is versioned SQL, and Hibernate checks that the entities match it at startup. |
-| **PostgreSQL everywhere** | Dev (Docker Compose), tests (Testcontainers) and production all run the same database, so SQL that works locally works in production. |
+| **SQL Server everywhere** | Dev (Docker Compose), tests (Testcontainers) and production (Azure SQL Database, free tier) all run the same engine, so SQL that works locally works in production. Text columns are `nvarchar`, so names in any language are stored as typed. |
 | **Profiles** (`dev`, `test`, `prod`) | Demo data and live template reloads locally; credentials from environment variables in production. |
 | **Constructor injection, `final` fields** | Dependencies are explicit and classes are easy to test. |
 | **Progressive enhancement** | Every page works without JavaScript; JS only adds the chart, a split preview and delete confirmations. |
@@ -147,9 +151,12 @@ src/main/resources
 
 - **CI (GitHub Actions)**: every push and pull request compiles, runs all tests, uploads the test and
   coverage reports, then builds the Docker image. See `.github/workflows/ci.yml`.
+- **CD (GitHub Actions → Azure)**: when CI passes on `main`, the exact commit it tested is built and deployed to
+  Azure App Service, then checked with the health endpoint. See `.github/workflows/deploy.yml` and
+  [Deploy to Azure](#deploy-to-azure).
 - **Docker**: multi-stage build, a layered jar for fast rebuilds, a small JRE image, a non-root user,
   memory-aware JVM settings and a built-in health check.
-- **Docker Compose**: PostgreSQL for local development (started automatically by `mvn spring-boot:run`), plus
+- **Docker Compose**: SQL Server for local development (started automatically by `mvn spring-boot:run`), plus
   the app container behind the `app` profile, started in the right order using health checks.
 - **Health and metrics** with Spring Boot Actuator: `/actuator/health` (with liveness and readiness probes),
   `/actuator/info` (both public) and `/actuator/metrics` (needs a login).
@@ -164,21 +171,188 @@ src/main/resources
 | `BalanceCalculatorTest` | Balances, uneven splits, payers who aren't participants |
 | `SettlementCalculatorTest` | Payment plans, invalid input, and a 200-run randomized property test |
 | `CsvExporterTest` | Quoting and formula-injection escaping |
-| `ExpenseFlowIntegrationTest` | Real services against the real Flyway schema on PostgreSQL (Testcontainers): create, edit, delete, business rules, users only seeing their own groups |
-| `WebFlowTest` | HTTP requests through MockMvc against PostgreSQL (Testcontainers) that render the real templates: validation errors, 404 page, CSV download, health check |
+| `ExpenseFlowIntegrationTest` | Real services against the real Flyway schema on SQL Server (Testcontainers): create, edit, delete, business rules, users only seeing their own groups |
+| `WebFlowTest` | HTTP requests through MockMvc against SQL Server (Testcontainers) that render the real templates: validation errors, 404 page, CSV download, health check |
 | `SecurityFlowTest` | Sign-up (validation, duplicate email, BCrypt hash), login, wrong password, remember-me cookie, logout, CSRF rejection |
 | `AuthorizationWebTest` | Walks every group, expense, member and export URL as a user who isn't in the group: all 404, nothing changes |
 
-## Deploying
+## Deploy to Azure
 
-Any host that runs a Docker image works, for example Render, Railway or Fly.io:
+Tally runs on **Azure App Service** (Java 21) with **Azure SQL Database** on its free tier. Every push to
+`main` that passes CI is deployed automatically by `.github/workflows/deploy.yml`. Secrets live in App Service
+settings and GitHub secrets, never in the code.
 
-1. Create a PostgreSQL database on the host.
-2. Deploy from the `Dockerfile`, and set `DB_URL` (for example `jdbc:postgresql://host:5432/tally`),
-   `DB_USERNAME`, `DB_PASSWORD` and `REMEMBER_ME_KEY` (a long random value, e.g. `openssl rand -base64 32`;
-   the app won't start without it). `DEMO_DATA=true` adds the demo accounts, whose password is public, so
-   never set it on a server other people can reach.
-3. Point the host's health check at `/actuator/health`.
+You do steps 1 to 5 once. They need the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli)
+(`brew install azure-cli` on a Mac) and an Azure for Students subscription.
+
+### 1. Sign in and pick names
+
+```bash
+az login
+az account show --query "{name:name, id:id, tenant:tenantId}" -o table   # check this is your student subscription
+
+RG=tally-rg
+LOCATION=francecentral            # must be a region your subscription allows; see the note below
+APP=tally-$RANDOM                 # becomes https://$APP.azurewebsites.net, must be unique worldwide
+SQL_SERVER=tally-sql-$RANDOM      # becomes $SQL_SERVER.database.windows.net
+SQL_USER=tallyadmin
+SQL_PASSWORD="$(openssl rand -base64 18 | tr -d '/+=')Aa1"   # Azure SQL wants upper, lower and a digit
+echo "App: $APP  Database server: $SQL_SERVER  Database password: $SQL_PASSWORD"   # save these somewhere safe
+```
+
+Azure for Students only lets you create resources in a handful of regions, and the list differs per account.
+See yours with:
+
+```bash
+az policy assignment list --query "[].parameters.listOfAllowedLocations.value" -o tsv
+```
+
+Pick one of those for `LOCATION`. If a command still fails with `RequestDisallowedByAzure`, the region isn't
+allowed: change `LOCATION` and run that command again. (The resource group itself may live in any region.)
+
+### 2. Create the database
+
+A new subscription has to switch on the database and web app services once (takes a minute or two each):
+
+```bash
+az provider register -n Microsoft.Sql --wait
+az provider register -n Microsoft.Web --wait
+```
+
+Then create a logical SQL server and one database on Azure's
+[free offer](https://learn.microsoft.com/azure/azure-sql/database/free-offer) (free for the life of the subscription,
+one free database per subscription):
+
+```bash
+az group create -n $RG -l $LOCATION
+
+az sql server create -g $RG -n $SQL_SERVER -l $LOCATION \
+  --admin-user $SQL_USER --admin-password "$SQL_PASSWORD"
+
+# 0.0.0.0 is Azure's shorthand for "services running inside Azure", such as the web app. Not the internet.
+az sql server firewall-rule create -g $RG -s $SQL_SERVER -n AllowAzureServices \
+  --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0
+
+az sql db create -g $RG -s $SQL_SERVER -n tally \
+  -e GeneralPurpose -f Gen5 -c 2 --compute-model Serverless \
+  --use-free-limit --free-limit-exhaustion-behavior AutoPause
+```
+
+The free database pauses after about an hour without traffic. The next visitor then waits up to a minute while it
+wakes up; the app is configured to wait for it (`application-prod.yml`). If the month's free allowance runs out,
+`AutoPause` pauses it until the next month instead of charging your credit.
+
+### 3. Create the web app
+
+App Service quota is set per region, and student subscriptions often have 0 for both the paid B1 and the free F1
+plan in some regions ("Operation cannot be completed without additional quota"). The web app doesn't have to be in
+the database's region, so this tries the free F1 plan in each region you're allowed to use and keeps the first that
+works (failed attempts leave nothing behind):
+
+```bash
+for L in $(az policy assignment list --query "[].parameters.listOfAllowedLocations.value[]" -o tsv); do
+  echo "Trying $L..."
+  if az appservice plan create -g $RG -n tally-plan -l $L --is-linux --sku F1 -o none 2>/dev/null; then
+    WEB_LOCATION=$L; echo "Created the plan in $L"; break
+  fi
+done
+```
+
+F1 is free and enough for a school project. It doesn't support "always on", so the app sleeps when idle. If you
+get B1 quota later (portal → **Quotas**, provider *App Service*), move up with
+`az appservice plan update -g $RG -n tally-plan --sku B1` and then `az webapp config set -g $RG -n $APP --always-on true`.
+
+```bash
+az webapp create -g $RG -p tally-plan -n $APP --runtime "JAVA:21-java21"
+
+az webapp config appsettings set -g $RG -n $APP --settings \
+  SPRING_PROFILES_ACTIVE=prod \
+  DB_URL="jdbc:sqlserver://$SQL_SERVER.database.windows.net:1433;database=tally;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=60" \
+  DB_USERNAME=$SQL_USER \
+  DB_PASSWORD="$SQL_PASSWORD" \
+  REMEMBER_ME_KEY="$(openssl rand -base64 32)"
+
+az webapp update -g $RG -n $APP --https-only true
+az webapp config set -g $RG -n $APP --http20-enabled true \
+  --generic-configurations '{"healthCheckPath": "/actuator/health/readiness"}'
+```
+
+The app reads all of these as environment variables (see `application-prod.yml`). Flyway creates the tables on the
+first start. Don't set `DEMO_DATA` here: the demo accounts' password is in this README.
+
+### 4. Let GitHub Actions deploy
+
+GitHub signs in to Azure with OpenID Connect, so no Azure password is stored in GitHub.
+
+```bash
+SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+TENANT_ID=$(az account show --query tenantId -o tsv)
+WEBAPP_ID=$(az webapp show -g $RG -n $APP --query id -o tsv)
+
+CLIENT_ID=$(az ad app create --display-name tally-github-deploy --query appId -o tsv)
+az ad sp create --id $CLIENT_ID
+az role assignment create --assignee $CLIENT_ID --role "Website Contributor" --scope $WEBAPP_ID
+
+az ad app federated-credential create --id $CLIENT_ID --parameters '{
+  "name": "github-production",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:velkosska/Tally:environment:production",
+  "audiences": ["api://AzureADTokenExchange"]
+}'
+
+echo "AZURE_CLIENT_ID=$CLIENT_ID"
+echo "AZURE_TENANT_ID=$TENANT_ID"
+echo "AZURE_SUBSCRIPTION_ID=$SUBSCRIPTION_ID"
+echo "AZURE_WEBAPP_NAME=$APP"
+```
+
+Then on GitHub, open the repository's **Settings**:
+
+1. **Environments → New environment** named `production`.
+2. **Secrets and variables → Actions → Secrets**: add `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and
+   `AZURE_SUBSCRIPTION_ID` with the values printed above.
+3. **Secrets and variables → Actions → Variables**: add `AZURE_WEBAPP_NAME` with your app name.
+
+Until `AZURE_WEBAPP_NAME` is set, the deploy workflow skips itself, so CI stays green before Azure is ready.
+
+**If `az ad app create` is refused** (some university accounts aren't allowed to create app registrations), use a
+publish profile instead. It is a password for this one app, so keep it secret:
+
+```bash
+az resource update -g $RG --namespace Microsoft.Web --resource-type basicPublishingCredentialsPolicies \
+  --parent sites/$APP -n scm --set properties.allow=true
+az webapp deployment list-publishing-profiles -g $RG -n $APP --xml
+```
+
+Paste the whole XML output into a GitHub secret named `AZURE_WEBAPP_PUBLISH_PROFILE`, skip the three `AZURE_*_ID`
+secrets, and still add the `AZURE_WEBAPP_NAME` variable. The workflow uses the publish profile when it is set.
+
+### 5. Deploy
+
+Push to `main`, or open **Actions → Deploy to Azure → Run workflow**. The workflow builds the jar of the commit CI
+tested, deploys it, then waits (up to 10 minutes) until `/actuator/health` reports `UP`. The live URL appears on the run's summary.
+
+### Day to day
+
+| Task | How |
+|---|---|
+| See the logs | Azure portal → your web app → **Log stream**, or `az webapp log tail -g $RG -n $APP` |
+| Change a setting | `az webapp config appsettings set -g $RG -n $APP --settings NAME=value` (the app restarts) |
+| Connect with a SQL client | Allow your IP once: `az sql server firewall-rule create -g $RG -s $SQL_SERVER -n my-ip --start-ip-address <your IP> --end-ip-address <your IP>`, or use the portal's **Query editor** |
+| Save credit when you're not using it | `az webapp stop -g $RG -n $APP` (`start` to resume). The database pauses by itself and costs nothing on the free offer |
+| Remove everything | `az group delete -n $RG` |
+
+**Cost:** the F1 plan is free; B1 costs roughly 13 USD a month from your student credit. The database is free:
+100,000 vCore seconds and 32 GB a month, and with `AutoPause` it never bills. Check **Cost Management** in the
+portal now and then. On F1 the app sleeps after about 20 minutes without visitors and has 60 CPU minutes a day, so the
+first visit after a quiet spell is slow (the app and the database both wake up).
+
+### Other hosts
+
+Anything that runs the `Dockerfile` with a SQL Server database works too: set `DB_URL`,
+`DB_USERNAME`, `DB_PASSWORD` and `REMEMBER_ME_KEY` (the app won't start without it), and point the host's health
+check at `/actuator/health`. `DEMO_DATA=true` adds the demo accounts, whose password is public, so never set it on a
+server other people can reach.
 
 ## Ideas for next steps
 

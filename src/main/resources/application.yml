@@ -7,6 +7,10 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        # Strings are nvarchar in SQL Server, so any language and the € sign are stored correctly.
+        use_nationalized_character_data: true
   flyway:
     locations: classpath:db/migration
 

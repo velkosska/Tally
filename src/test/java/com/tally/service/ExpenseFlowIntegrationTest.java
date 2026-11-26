@@ -24,7 +24,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Runs the real services against the real schema (Flyway on PostgreSQL via Testcontainers) to test whole use cases. */
+/** Runs the real services against the real schema (Flyway on SQL Server via Testcontainers) to test whole use cases. */
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
 @ActiveProfiles("test")

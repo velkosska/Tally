@@ -1,4 +1,4 @@
-# The datasource comes from the PostgreSQL Testcontainer in TestcontainersConfiguration.
+# The datasource comes from the SQL Server Testcontainer in TestcontainersConfiguration.
 tally:
   demo-data:
     enabled: false

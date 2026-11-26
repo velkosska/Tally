@@ -1,4 +1,4 @@
-# Local development: PostgreSQL from docker-compose.yml, demo data, live template reloads.
+# Local development: SQL Server from docker-compose.yml, demo data, live template reloads.
 # `mvn spring-boot:run` starts the `db` service automatically (spring-boot-docker-compose) and
 # connects to it, so no datasource settings are needed here. Docker must be running.
 spring:

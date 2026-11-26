@@ -1,0 +1,80 @@
+name: Deploy to Azure
+
+# Runs after the CI workflow has passed on main, so only tested commits reach production.
+# Can also be started by hand from the Actions tab ("Run workflow").
+# Setup (Azure resources, GitHub secrets and variables): see "Deploy to Azure" in the README.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # lets the job sign in to Azure with OpenID Connect, without a stored password
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false   # never stop a deployment halfway
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    # Skip when CI failed, and skip quietly until the Azure setup is done (the variable isn't set yet).
+    if: >-
+      vars.AZURE_WEBAPP_NAME != '' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    environment:
+      name: production
+      url: https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net
+    env:
+      PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The exact commit CI tested, not whatever main points to now.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Build the jar (tests already ran in CI)
+        run: mvn -B -q package -DskipTests
+
+      - name: Sign in to Azure (OpenID Connect)
+        if: env.PUBLISH_PROFILE == ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          package: target/*.jar
+          # Empty when signing in with OpenID Connect; the fallback for accounts that can't create an app registration.
+          publish-profile: ${{ env.PUBLISH_PROFILE }}
+
+      - name: Check the new version is healthy
+        run: |
+          url="https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net/actuator/health"
+          # Up to 10 minutes: on the free F1 plan Java starts slowly, and a paused Azure SQL database
+          # needs about a minute to wake up on the first connection.
+          for attempt in $(seq 1 60); do
+            if curl -fsS "$url" | grep -q '"status":"UP"'; then
+              echo "Healthy: $url"
+              exit 0
+            fi
+            echo "Not healthy yet (attempt $attempt), waiting 10 s..."
+            sleep 10
+          done
+          echo "The app did not report UP within 10 minutes. Check Log stream in the Azure portal."
+          exit 1

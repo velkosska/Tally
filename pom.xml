@@ -60,11 +60,11 @@
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-database-postgresql</artifactId>
+            <artifactId>flyway-sqlserver</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
+            <groupId>com.microsoft.sqlserver</groupId>
+            <artifactId>mssql-jdbc</artifactId>
             <scope>runtime</scope>
         </dependency>
 
@@ -81,7 +81,7 @@
             <scope>runtime</scope>
             <optional>true</optional>
         </dependency>
-        <!-- Starts PostgreSQL from docker-compose.yml on `mvn spring-boot:run`; never packaged in the jar -->
+        <!-- Starts SQL Server from docker-compose.yml on `mvn spring-boot:run`; never packaged in the jar -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-docker-compose</artifactId>
@@ -100,7 +100,7 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- Integration tests run against a real PostgreSQL in a throwaway Docker container -->
+        <!-- Integration tests run against a real SQL Server in a throwaway Docker container -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-testcontainers</artifactId>
@@ -113,7 +113,7 @@
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>postgresql</artifactId>
+            <artifactId>mssqlserver</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

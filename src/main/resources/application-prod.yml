@@ -1,14 +1,30 @@
-# Production: PostgreSQL configured through environment variables, never hard-coded.
+# Production: Azure SQL Database configured through environment variables, never hard-coded.
 spring:
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      # The free Azure SQL database pauses when idle and takes up to about a minute to wake up.
+      # Wait for it instead of failing: at startup (Flyway) and when a request needs a connection.
+      initialization-fail-timeout: 120000
+      connection-timeout: 90000
   jpa:
     properties:
       hibernate:
         jdbc:
           time_zone: UTC
+
+server:
+  # Azure App Service (like most hosts) ends HTTPS at a proxy and forwards plain HTTP with X-Forwarded-* headers.
+  # Trusting them lets the app see the original https:// URL, so redirects stay on https and the session and
+  # remember-me cookies get the Secure flag. Only safe when the app is reachable through that proxy alone.
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        # The login cookie is only ever sent over HTTPS. docker-compose.yml turns this off for http://localhost.
+        secure: ${SESSION_COOKIE_SECURE:true}
 
 tally:
   demo-data:
