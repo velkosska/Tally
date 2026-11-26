@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Join ' + ${invite.groupName})}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar}"></header>
+<div th:replace="~{fragments/layout :: flash}"></div>
+
+<main class="wrap page page--narrow">
+    <p class="eyebrow">You're invited</p>
+    <h1 th:text="'Join ' + ${invite.groupName}">Join Lisbon weekend</h1>
+    <p class="lead" th:if="${invite.groupDescription}" th:text="${invite.groupDescription}">Trip</p>
+    <p class="muted" th:text="'Already in it: ' + ${#strings.listJoin(invite.memberNames, ', ')}">
+        Already in it: Ana, Ben, Carla
+    </p>
+
+    <form class="form panel" method="post" th:action="@{/invites/{t}(t=${token})}" th:if="${!invite.claimable.isEmpty()}">
+        <fieldset class="claim">
+            <legend>Are you one of these people?</legend>
+            <p class="muted">Someone may have added you by name before you had an account. Pick your name and
+                the expenses already logged for it become yours.</p>
+            <div class="claim__options">
+                <label class="check" th:each="m : ${invite.claimable}">
+                    <input type="radio" name="member" th:value="${m.id}" th:checked="${#strings.equalsIgnoreCase(m.name, invite.suggestedName)}" required>
+                    <span th:text="${m.name}">Ben</span>
+                </label>
+            </div>
+        </fieldset>
+        <div class="form__actions">
+            <button class="btn" type="submit">That's me, join</button>
+        </div>
+    </form>
+
+    <form class="form panel" method="post" th:action="@{/invites/{t}(t=${token})}">
+        <h2 class="panel__title" th:text="${invite.claimable.isEmpty()} ? 'Join the group' : 'I’m someone new'">
+            Join the group
+        </h2>
+        <div class="field">
+            <label for="name">Your name in this group</label>
+            <input id="name" name="name" type="text" maxlength="50" required th:value="${invite.suggestedName}">
+        </div>
+        <div class="form__actions">
+            <button class="btn" th:classappend="${invite.claimable.isEmpty()} ? '' : 'btn--ghost'"
+                    type="submit">Join as a new member</button>
+        </div>
+    </form>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

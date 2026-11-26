@@ -69,6 +69,11 @@ public class Member {
         return user != null && user.getId() == userId;
     }
 
+    /** Links this name-only member to the account of the person who claimed it through an invite. */
+    void linkTo(AppUser account) {
+        this.user = account;
+    }
+
     /** Identity is the database id, which also works when Hibernate hands us a lazy proxy. */
     @Override
     public boolean equals(Object other) {

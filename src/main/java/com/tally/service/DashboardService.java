@@ -49,7 +49,7 @@ public class DashboardService {
         return new GroupDashboard(
                 group.getId(), group.getName(), group.getDescription(), group.getCurrency(),
                 total, average(total, members.size()),
-                memberOptions(members, expenses),
+                memberOptions(members, expenses, userId),
                 balances(members, expenses, net),
                 settlement(net, names),
                 categoryTotals(expenses, total),
@@ -63,10 +63,11 @@ public class DashboardService {
                 .toList();
     }
 
-    private static List<MemberOption> memberOptions(List<Member> members, List<Expense> expenses) {
+    private static List<MemberOption> memberOptions(List<Member> members, List<Expense> expenses, long userId) {
         return members.stream()
                 .map(m -> new MemberOption(m.getId(), m.getName(),
-                        !m.hasAccount() && expenses.stream().noneMatch(e -> e.involves(m))))
+                        !m.hasAccount() && expenses.stream().noneMatch(e -> e.involves(m)),
+                        m.hasAccount(), m.isLinkedTo(userId)))
                 .toList();
     }
 

@@ -27,7 +27,7 @@ public class ExpenseService {
     public ExpenseFormPage formPage(long userId, long groupId) {
         ExpenseGroup group = groups.getForUser(groupId, userId);
         List<MemberOption> members = group.getMembers().stream()
-                .map(m -> new MemberOption(m.getId(), m.getName(), false))
+                .map(m -> new MemberOption(m.getId(), m.getName()))
                 .toList();
         return new ExpenseFormPage(group.getId(), group.getName(), group.getCurrency(), members);
     }

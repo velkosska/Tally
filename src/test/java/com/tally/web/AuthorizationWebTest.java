@@ -105,7 +105,9 @@ class AuthorizationWebTest {
                 post("/groups/{g}/expenses/{e}", groupId, expenseId).param("description", "Changed")
                         .param("amount", "999").param("category", "OTHER").param("date", LocalDate.now().toString())
                         .param("paidById", String.valueOf(memberId)).param("participantIds", String.valueOf(memberId)),
-                post("/groups/{g}/expenses/{e}/delete", groupId, expenseId));
+                post("/groups/{g}/expenses/{e}/delete", groupId, expenseId),
+                post("/groups/{g}/invites", groupId),
+                post("/groups/{g}/invites/revoke", groupId));
 
         for (MockHttpServletRequestBuilder change : changes) {
             mvc.perform(change.with(user(mallory)).with(csrf())).andExpect(status().isNotFound());

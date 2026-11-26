@@ -1,5 +1,6 @@
 package com.tally.web;
 
+import com.tally.invite.InviteService;
 import com.tally.service.DashboardService;
 import com.tally.service.GroupService;
 import com.tally.web.form.GroupForm;
@@ -23,10 +24,13 @@ public class GroupController {
 
     private final GroupService groupService;
     private final DashboardService dashboardService;
+    private final InviteService inviteService;
 
-    public GroupController(GroupService groupService, DashboardService dashboardService) {
+    public GroupController(GroupService groupService, DashboardService dashboardService,
+                           InviteService inviteService) {
         this.groupService = groupService;
         this.dashboardService = dashboardService;
+        this.inviteService = inviteService;
     }
 
     @ModelAttribute("currencies")
@@ -37,6 +41,7 @@ public class GroupController {
     @GetMapping("/")
     public String index(@AuthenticationPrincipal TallyUser user, Model model) {
         model.addAttribute("groups", groupService.listGroups(user.id()));
+        model.addAttribute("friends", groupService.listFriends(user.id()));
         return "groups/index";
     }
 
@@ -61,6 +66,7 @@ public class GroupController {
     @GetMapping("/groups/{groupId}")
     public String show(@AuthenticationPrincipal TallyUser user, @PathVariable long groupId, Model model) {
         model.addAttribute("group", dashboardService.dashboard(user.id(), groupId));
+        model.addAttribute("activeInviteLinks", inviteService.countActiveLinks(user.id(), groupId));
         if (!model.containsAttribute("memberForm")) {
             model.addAttribute("memberForm", new MemberForm());
         }

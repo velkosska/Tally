@@ -49,6 +49,17 @@
             </li>
         </ul>
     </section>
+
+    <section class="friends" aria-labelledby="friends-heading" th:unless="${friends.isEmpty()}">
+        <h2 id="friends-heading">People you share groups with</h2>
+        <ul class="friends__list">
+            <li th:each="f : ${friends}">
+                <span class="avatar" th:text="${#strings.substring(f.name, 0, 1)}">B</span>
+                <span class="friends__name" th:text="${f.name}">Ben</span>
+                <span class="muted" th:text="${f.sharedGroups == 1 ? '1 group' : f.sharedGroups + ' groups'}">2 groups</span>
+            </li>
+        </ul>
+    </section>
 </main>
 
 <footer th:replace="~{fragments/layout :: footer}"></footer>

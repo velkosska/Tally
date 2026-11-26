@@ -1,6 +1,6 @@
 /*
  * Small progressive enhancements. Every page works without JavaScript;
- * this only adds confirmations, the split preview, the chart and toast dismissal.
+ * this only adds confirmations, copy buttons, the split preview, the chart and toast dismissal.
  */
 (function () {
     "use strict";
@@ -19,6 +19,25 @@
             toast.classList.add("is-leaving");
             setTimeout(function () { toast.remove(); }, 400);
         }, 4500);
+    });
+
+    // Copy buttons: <button data-copy="#input-id">. Without JavaScript the link can still be selected by hand.
+    document.querySelectorAll("[data-copy]").forEach(function (button) {
+        var input = document.querySelector(button.dataset.copy);
+        var status = button.closest("div").parentElement.querySelector("[data-copy-status]");
+        button.addEventListener("click", function () {
+            input.select();
+            var done = function () {
+                button.textContent = "Copied";
+                if (status) { status.textContent = "Copied. Paste it in your group chat."; }
+            };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(input.value).then(done, function () { document.execCommand("copy"); done(); });
+            } else {
+                document.execCommand("copy");
+                done();
+            }
+        });
     });
 
     // Expense form: "Everyone / No one" shortcuts and a live "each pays" preview.

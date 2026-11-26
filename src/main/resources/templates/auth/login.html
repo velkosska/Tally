@@ -11,6 +11,7 @@
     <form class="form panel" method="post" th:action="@{/login}" novalidate>
         <p class="form__error" th:if="${param.error}" role="alert">That email and password don't match an account.</p>
         <p class="form__notice" th:if="${param.logout}" role="status">You're logged out.</p>
+        <p class="form__notice" th:if="${joiningGroup}" role="status">Log in to join the group you were invited to. New here? Create an account below.</p>
 
         <div class="field">
             <label for="email">Email</label>

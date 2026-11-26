@@ -75,7 +75,7 @@ public class ExpenseGroup {
     /** Adds a member, optionally linked to a user account so that user can open the group. */
     public Member addMember(String memberName, AppUser user) {
         String cleanName = memberName.strip();
-        if (user != null && members.stream().anyMatch(m -> m.isLinkedTo(user.getId()))) {
+        if (user != null && hasMemberLinkedTo(user.getId())) {
             throw new BusinessRuleException("You are already a member of this group.");
         }
         members.stream()
@@ -87,6 +87,27 @@ public class ExpenseGroup {
         Member member = new Member(this, cleanName, user);
         members.add(member);
         return member;
+    }
+
+    /**
+     * Lets a user who joined through an invite take over a member that was added by name before they
+     * had an account, so the expenses already logged for that name become theirs.
+     */
+    public Member claimMember(long memberId, AppUser user) {
+        if (hasMemberLinkedTo(user.getId())) {
+            throw new BusinessRuleException("You are already a member of this group.");
+        }
+        Member member = findMember(memberId);
+        if (member.hasAccount()) {
+            throw new BusinessRuleException(member.getName()
+                    + " has already joined with their own account. Pick another name or join as someone new.");
+        }
+        member.linkTo(user);
+        return member;
+    }
+
+    public boolean hasMemberLinkedTo(long userId) {
+        return members.stream().anyMatch(m -> m.isLinkedTo(userId));
     }
 
     public void removeMember(long memberId) {

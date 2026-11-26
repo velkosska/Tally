@@ -1,6 +1,7 @@
 package com.tally.web;
 
 import com.tally.domain.NotFoundException;
+import com.tally.invite.InvalidInviteException;
 import org.springframework.http.HttpStatus;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -16,5 +17,12 @@ public class GlobalExceptionHandler {
     public String notFound(NotFoundException e, Model model) {
         model.addAttribute("message", e.getMessage());
         return "error/404";
+    }
+
+    /** Unknown, expired and switched-off links all look the same, so nobody learns which links existed. */
+    @ExceptionHandler(InvalidInviteException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public String invalidInvite() {
+        return "invites/invalid";
     }
 }

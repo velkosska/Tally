@@ -14,6 +14,10 @@ JUnit 5 · Testcontainers · Docker · GitHub Actions · Azure App Service
   Everyone only sees the groups they are a member of.
 - **Groups and members**: one group per trip or flat, each with its own currency. The person who creates a group
   is its first member; other members can be added by name.
+- **Invite links**: any member can create a share link and paste it in a group chat (Tally never sends emails).
+  Whoever opens it logs in or signs up, then either joins as someone new or claims a name that was added before
+  they had an account, which keeps that name's expenses. Links work for 14 days and can be switched off at any time.
+  The home page lists the people you share groups with.
 - **Expenses**: who paid, how much, a category, and who it is split between (equally, to the cent).
 - **Balances**: a diverging bar chart showing who is owed and who owes.
 - **Settle up**: the minimum-payment plan, shown as a receipt.
@@ -41,6 +45,9 @@ The `dev` profile creates two demo accounts, both with the password `tally-demo`
 |---|---|
 | `ana@example.com` | "Lisbon weekend" and "Flat 3B" |
 | `ben@example.com` | only "Lisbon weekend", which shows that people only see their own groups |
+
+To try invites, open a group as Ana, click **Create invite link** under *Invite people*, and open the link in a
+private window. Sign up there and you can claim "Carla" or "Dani", who were added by name.
 
 Or create your own account at <http://localhost:8080/signup>. Data is kept in the `db-data` Docker volume
 between runs; `docker compose down -v` wipes it. (Groups created before accounts existed belong to nobody and
@@ -118,6 +125,7 @@ Browser ──HTTP──▶ security       Spring Security: login, remember-me, 
 ```
 src/main/java/com/tally
 ├── account/       AppUser, AccountService (sign-up, BCrypt password hashes)
+├── invite/        GroupInvite (a share link), InviteService (create, switch off, join, claim a name)
 ├── security/      SecurityConfig, TallyUser (the logged-in user), user lookup, login after sign-up
 ├── domain/        ExpenseGroup (aggregate root), Member (optionally linked to a user), Expense, Category, repository
 ├── settlement/    BalanceCalculator, SettlementCalculator (the algorithm)
@@ -137,6 +145,8 @@ src/main/resources
 | `ExpenseGroup` is an **aggregate root** | Members and expenses are only changed through the group, so rules such as "the payer must be in the group" and "no duplicate names" are enforced in one place. |
 | **Command and view records** between layers | Services never see web form classes, and templates never see JPA entities. `open-in-view` is off, so lazy-loading bugs can't hide in templates. |
 | **Access checks in the service layer** | Every service method takes the user's id and loads the group with `ExpenseGroupRepository.getForUser`, so no URL can skip the check. A group you aren't in answers 404, the same as one that doesn't exist, so ids can't be probed. |
+| **Invite links store only a hash** | A link holds 32 random bytes. The database keeps their SHA-256 hash, so someone who reads the database still can't join groups. Unknown, expired and switched-off links all show the same "doesn't work any more" page. |
+| **Claiming a name instead of merging people** | People are often added by name before they have an account. Joining through a link can link the account to that existing member, so the expenses already logged for them stay correct. Only members without an account can be claimed. |
 | **Remember-me tokens in the database** | "Keep me logged in" uses Spring Security's persistent tokens (`persistent_logins` table): the cookie holds a random token, not the password hash, it rotates on every use and can be revoked. |
 | **Algorithm is framework-free** | `settlement/` is plain Java: fast to unit-test and easy to explain. |
 | **Money in cents / `BigDecimal`** | Floating point can't represent most decimal amounts exactly. |
@@ -144,7 +154,7 @@ src/main/resources
 | **SQL Server everywhere** | Dev (Docker Compose), tests (Testcontainers) and production (Azure SQL Database, free tier) all run the same engine, so SQL that works locally works in production. Text columns are `nvarchar`, so names in any language are stored as typed. |
 | **Profiles** (`dev`, `test`, `prod`) | Demo data and live template reloads locally; credentials from environment variables in production. |
 | **Constructor injection, `final` fields** | Dependencies are explicit and classes are easy to test. |
-| **Progressive enhancement** | Every page works without JavaScript; JS only adds the chart, a split preview and delete confirmations. |
+| **Progressive enhancement** | Every page works without JavaScript; JS only adds the chart, a split preview, copy buttons and delete confirmations. |
 | **CSV injection protection** | Cells starting with `=`, `+`, `-` or `@` are escaped so Excel won't run them as formulas. |
 
 ## DevOps
@@ -174,7 +184,8 @@ src/main/resources
 | `ExpenseFlowIntegrationTest` | Real services against the real Flyway schema on SQL Server (Testcontainers): create, edit, delete, business rules, users only seeing their own groups |
 | `WebFlowTest` | HTTP requests through MockMvc against SQL Server (Testcontainers) that render the real templates: validation errors, 404 page, CSV download, health check |
 | `SecurityFlowTest` | Sign-up (validation, duplicate email, BCrypt hash), login, wrong password, remember-me cookie, logout, CSRF rejection |
-| `AuthorizationWebTest` | Walks every group, expense, member and export URL as a user who isn't in the group: all 404, nothing changes |
+| `AuthorizationWebTest` | Walks every group, expense, member, invite and export URL as a user who isn't in the group: all 404, nothing changes |
+| `InviteFlowTest` | Creating links, joining as someone new, claiming a name (and keeping its expenses), names that are taken, expired and switched-off links, only a hash stored, signing up from a link and landing back on it, the people-you-share-groups-with list |
 
 ## Deploy to Azure
 
@@ -359,4 +370,3 @@ server other people can reach.
 - Uneven splits (by percentage or exact amounts)
 - Marking a payment as settled, and keeping a history of settlements
 - PDF export of the receipt
-# Tally

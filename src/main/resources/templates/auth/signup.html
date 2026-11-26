@@ -9,6 +9,7 @@
     <p class="lead">Start a group for your next trip, your flat or a night out.</p>
 
     <form class="form panel" method="post" th:action="@{/signup}" th:object="${signupForm}" novalidate>
+        <p class="form__notice" th:if="${joiningGroup}" role="status">Create an account and you'll go straight back to your invite.</p>
 
         <div class="field" th:classappend="${#fields.hasErrors('displayName')} ? 'field--error'">
             <label for="displayName">Your name</label>

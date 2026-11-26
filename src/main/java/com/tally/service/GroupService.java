@@ -6,6 +6,7 @@ import com.tally.domain.Expense;
 import com.tally.domain.ExpenseGroup;
 import com.tally.domain.ExpenseGroupRepository;
 import com.tally.domain.Member;
+import com.tally.service.view.Friend;
 import com.tally.service.view.GroupCard;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,14 @@ public class GroupService {
     public List<GroupCard> listGroups(long userId) {
         return groups.findAllForUser(userId).stream()
                 .map(GroupService::toCard)
+                .toList();
+    }
+
+    /** People with an account who share a group with this user. */
+    @Transactional(readOnly = true)
+    public List<Friend> listFriends(long userId) {
+        return groups.findFriends(userId).stream()
+                .map(shared -> new Friend(shared.displayName(), shared.sharedGroups()))
                 .toList();
     }
 

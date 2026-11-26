@@ -179,7 +179,12 @@
                 <ul class="members" th:unless="${group.members.isEmpty()}">
                     <li th:each="m : ${group.members}">
                         <span class="avatar" th:text="${#strings.substring(m.name, 0, 1)}">A</span>
-                        <span class="members__name" th:text="${m.name}">Ana</span>
+                        <span class="members__name">
+                            <span th:text="${m.name}">Ana</span>
+                            <span class="members__status" th:if="${m.you}">you</span>
+                            <span class="members__status members__status--pending" th:unless="${m.joined}"
+                                  title="Added by name. They can claim it with an invite link.">not joined</span>
+                        </span>
                         <form method="post" th:if="${m.removable}"
                               th:action="@{/groups/{g}/members/{m}/delete(g=${group.id},m=${m.id})}"
                               th:data-confirm="'Remove ' + ${m.name} + ' from the group?'">
@@ -197,6 +202,36 @@
                     <input id="member-name" type="text" th:field="*{name}" maxlength="50"
                            placeholder="Add a person" required>
                     <button class="btn btn--small" type="submit">Add</button>
+                </form>
+                <p class="muted block__hint">Adding a name is enough to split costs. To let someone open this group
+                    themselves, send them an invite link.</p>
+            </section>
+
+            <section class="block block--side" id="invite" aria-labelledby="invite-heading">
+                <h2 id="invite-heading">Invite people</h2>
+                <p class="muted block__hint">Anyone with the link can join after logging in or signing up.
+                    Share it in your group chat. Links work for 14 days.</p>
+
+                <div class="invite-link" th:if="${inviteLink}">
+                    <label for="invite-url">Your new link</label>
+                    <div class="invite-link__row">
+                        <input id="invite-url" type="text" readonly th:value="${inviteLink}" data-copy-source>
+                        <button class="btn btn--small" type="button" data-copy="#invite-url">Copy</button>
+                    </div>
+                    <p class="muted" role="status" data-copy-status>This link is shown only once.</p>
+                </div>
+
+                <form method="post" th:action="@{/groups/{id}/invites(id=${group.id})}">
+                    <button class="btn btn--small" th:classappend="${inviteLink} ? 'btn--ghost' : ''" type="submit"
+                            th:text="${inviteLink} ? 'Create another link' : 'Create invite link'">Create invite link</button>
+                </form>
+
+                <form method="post" class="invite-revoke" th:if="${activeInviteLinks > 0}"
+                      th:action="@{/groups/{id}/invites/revoke(id=${group.id})}"
+                      data-confirm="Switch off every invite link for this group? People who already joined stay in.">
+                    <span class="muted" th:text="${activeInviteLinks == 1 ? '1 link works right now.'
+                            : activeInviteLinks + ' links work right now.'}">1 link works right now.</span>
+                    <button class="link-btn link-btn--danger" type="submit">Switch off links</button>
                 </form>
             </section>
 
