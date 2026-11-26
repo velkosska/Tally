@@ -7,6 +7,7 @@ import com.tally.domain.Expense.ExpenseDetails;
 import com.tally.domain.ExpenseGroup;
 import com.tally.domain.ExpenseGroupRepository;
 import com.tally.domain.Member;
+import com.tally.settlement.SplitMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -18,7 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Creates two demo accounts and two example groups so the app has something to show on first run.
@@ -78,7 +81,14 @@ public class DemoDataLoader implements ApplicationRunner {
 
         LocalDate start = LocalDate.now().minusDays(12);
         List<Member> all = List.of(ana, ben, carla, dani);
-        add(trip, "Apartment in Alfama", "384.00", Category.ACCOMMODATION, start, ana, all);
+        // Carla arrived a night later, so the apartment is split by nights stayed.
+        Map<Member, BigDecimal> nights = new LinkedHashMap<>();
+        nights.put(ana, new BigDecimal("3"));
+        nights.put(ben, new BigDecimal("3"));
+        nights.put(carla, new BigDecimal("2"));
+        nights.put(dani, new BigDecimal("3"));
+        trip.addExpense(new ExpenseDetails("Apartment in Alfama", new BigDecimal("384.00"), Category.ACCOMMODATION,
+                start, ana, SplitMethod.SHARES, nights));
         add(trip, "Flights to Lisbon", "236.80", Category.TRANSPORT, start, ben, all);
         add(trip, "Seafood dinner at the harbour", "142.50", Category.FOOD, start.plusDays(1), carla, all);
         add(trip, "Tram 28 tickets", "12.00", Category.TRANSPORT, start.plusDays(1), dani, List.of(ana, dani, ben));
@@ -103,7 +113,9 @@ public class DemoDataLoader implements ApplicationRunner {
 
     private static void add(ExpenseGroup group, String description, String amount, Category category,
                             LocalDate date, Member paidBy, List<Member> participants) {
+        Map<Member, BigDecimal> equally = new LinkedHashMap<>();
+        participants.forEach(member -> equally.put(member, null));
         group.addExpense(new ExpenseDetails(description, new BigDecimal(amount), category,
-                date, paidBy, participants));
+                date, paidBy, SplitMethod.EQUAL, equally));
     }
 }

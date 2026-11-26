@@ -7,6 +7,7 @@ import com.tally.service.GroupCommand;
 import com.tally.service.GroupService;
 import com.tally.service.DashboardService;
 import com.tally.service.view.MemberOption;
+import com.tally.settlement.SplitMethod;
 import com.tally.security.TallyUser;
 import com.tally.security.TallyUserDetailsService;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,7 +26,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasProperty;
+import static org.hamcrest.Matchers.is;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -113,7 +118,7 @@ class WebFlowTest {
 
         mvc.perform(get("/groups/{id}/expenses/new", groupId).with(user(ana)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Split equally between")));
+                .andExpect(content().string(containsString("How to split it")));
         mvc.perform(get("/groups/{g}/expenses/{e}/edit", groupId, expenseId).with(user(ana)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Hotel")));
@@ -152,6 +157,52 @@ class WebFlowTest {
         mvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("UP")));
+    }
+
+    @Test
+    void anExpenseCanBeSplitByShares() throws Exception {
+        long groupId = groupWithExpense();
+        List<MemberOption> members = dashboardService.dashboard(ana.id(), groupId).members();
+        long anaMember = members.get(0).id();
+        long benMember = members.get(1).id();
+
+        mvc.perform(post("/groups/{g}/expenses", groupId).with(user(ana)).with(csrf())
+                        .param("description", "Cabin").param("amount", "300.00").param("category", "ACCOMMODATION")
+                        .param("date", LocalDate.now().toString()).param("paidById", String.valueOf(benMember))
+                        .param("participantIds", String.valueOf(anaMember), String.valueOf(benMember))
+                        .param("splitMethod", "SHARES")
+                        .param("weights[" + anaMember + "]", "2")
+                        .param("weights[" + benMember + "]", "1"))
+                .andExpect(status().is3xxRedirection());
+
+        var cabin = dashboardService.dashboard(ana.id(), groupId).expenses().stream()
+                .filter(e -> e.description().equals("Cabin")).findFirst().orElseThrow();
+        assertThat(cabin.shares()).extracting("name", "amount")
+                .containsExactly(tuple("Ana", new BigDecimal("200.00")), tuple("Ben", new BigDecimal("100.00")));
+        mvc.perform(get("/groups/{id}", groupId).with(user(ana)))
+                .andExpect(content().string(containsString("Ben paid, split by shares")))
+                .andExpect(content().string(containsString("Ana €200.00")));
+        mvc.perform(get("/groups/{g}/expenses/{e}/edit", groupId, cabin.id()).with(user(ana)))
+                .andExpect(model().attribute("expenseForm", hasProperty("splitMethod", is(SplitMethod.SHARES))));
+    }
+
+    @Test
+    void percentagesThatDoNotAddUpAreRejected() throws Exception {
+        long groupId = groupWithExpense();
+        List<MemberOption> members = dashboardService.dashboard(ana.id(), groupId).members();
+
+        mvc.perform(post("/groups/{g}/expenses", groupId).with(user(ana)).with(csrf())
+                        .param("description", "Tickets").param("amount", "50").param("category", "OTHER")
+                        .param("date", LocalDate.now().toString())
+                        .param("paidById", String.valueOf(members.get(0).id()))
+                        .param("participantIds", String.valueOf(members.get(0).id()), String.valueOf(members.get(1).id()))
+                        .param("splitMethod", "PERCENT")
+                        .param("weights[" + members.get(0).id() + "]", "60")
+                        .param("weights[" + members.get(1).id() + "]", "30"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("expenses/form"))
+                .andExpect(content().string(containsString("The percentages add up to 90%")));
+        assertThat(dashboardService.dashboard(ana.id(), groupId).expenses()).hasSize(1);
     }
 
     private long groupWithExpense() {

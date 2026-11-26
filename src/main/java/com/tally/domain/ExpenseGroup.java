@@ -165,10 +165,11 @@ public class ExpenseGroup {
             throw new BusinessRuleException("Pick at least one person to split the expense between.");
         }
         boolean allMembers = members.contains(details.paidBy())
-                && members.containsAll(details.participants());
+                && members.containsAll(details.participants().keySet());
         if (!allMembers) {
             throw new BusinessRuleException("Everyone on an expense must be a member of this group.");
         }
+        Expense.checkSplit(details);
     }
 
     // ---- getters ----

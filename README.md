@@ -18,11 +18,14 @@ JUnit 5 · Testcontainers · Docker · GitHub Actions · Azure App Service
   Whoever opens it logs in or signs up, then either joins as someone new or claims a name that was added before
   they had an account, which keeps that name's expenses. Links work for 14 days and can be switched off at any time.
   The home page lists the people you share groups with.
-- **Expenses**: who paid, how much, a category, and who it is split between (equally, to the cent).
+- **Expenses**: who paid, how much, a category, and who it is split between.
+- **Uneven splits**: split an expense equally, by exact amounts, by percentages or by shares (for example nights
+  stayed). The form shows each person's part as you type and says when amounts or percentages don't add up.
 - **Balances**: a diverging bar chart showing who is owed and who owes.
 - **Settle up**: the minimum-payment plan, shown as a receipt.
 - **Spending by category**: a doughnut chart plus a table.
-- **CSV export**: expenses, balances and the payment plan, ready for Excel.
+- **CSV export**: expenses (with how each was split and everyone's part), balances and the payment plan,
+  ready for Excel.
 - Validation with friendly messages, a confirmation before deleting anything, custom 404 and error pages,
   and a responsive layout that works on phones.
 
@@ -48,6 +51,7 @@ The `dev` profile creates two demo accounts, both with the password `tally-demo`
 
 To try invites, open a group as Ana, click **Create invite link** under *Invite people*, and open the link in a
 private window. Sign up there and you can claim "Carla" or "Dani", who were added by name.
+In "Lisbon weekend", the apartment is split by shares (nights stayed), so you can see an uneven split right away.
 
 Or create your own account at <http://localhost:8080/signup>. Data is kept in the `db-data` Docker volume
 between runs; `docker compose down -v` wipes it. (Groups created before accounts existed belong to nobody and
@@ -86,6 +90,12 @@ Positive means the group owes them; negative means they owe the group. All balan
 **Step 2: splitting to the cent.** Money is never stored as `double`, because `0.1 + 0.2 != 0.3` in
 floating point. Tally works in whole cents (`long`) and only converts back to `BigDecimal` for display.
 If €100.00 is split three ways, the shares are €33.34 + €33.33 + €33.33, so no cent is ever lost.
+
+Uneven splits work the same way (`SplitCalculator`). Exact amounts must add up to the total and percentages to
+100. For percentages and shares, everyone first gets their share rounded down to the cent; the cents left over
+then go one each to the people whose share was rounded down the most (the *largest remainder* method). So
+€100.00 split 1 : 2 : 3 is €16.67 + €33.33 + €50.00. The form's live preview uses the same rule, so what you see
+before saving is what gets stored.
 
 **Step 3: the payment plan (greedy).**
 
@@ -128,7 +138,7 @@ src/main/java/com/tally
 ├── invite/        GroupInvite (a share link), InviteService (create, switch off, join, claim a name)
 ├── security/      SecurityConfig, TallyUser (the logged-in user), user lookup, login after sign-up
 ├── domain/        ExpenseGroup (aggregate root), Member (optionally linked to a user), Expense, Category, repository
-├── settlement/    BalanceCalculator, SettlementCalculator (the algorithm)
+├── settlement/    SplitCalculator, BalanceCalculator, SettlementCalculator (the algorithms)
 ├── service/       GroupService, ExpenseService, DashboardService, view/ records
 ├── web/           Controllers, form/ objects, MoneyFormatter, CsvExporter, error handling
 └── config/        DemoDataLoader
@@ -154,7 +164,7 @@ src/main/resources
 | **SQL Server everywhere** | Dev (Docker Compose), tests (Testcontainers) and production (Azure SQL Database, free tier) all run the same engine, so SQL that works locally works in production. Text columns are `nvarchar`, so names in any language are stored as typed. |
 | **Profiles** (`dev`, `test`, `prod`) | Demo data and live template reloads locally; credentials from environment variables in production. |
 | **Constructor injection, `final` fields** | Dependencies are explicit and classes are easy to test. |
-| **Progressive enhancement** | Every page works without JavaScript; JS only adds the chart, a split preview, copy buttons and delete confirmations. |
+| **Progressive enhancement** | Every page works without JavaScript; JS only adds the chart, the live split preview, copy buttons and delete confirmations. |
 | **CSV injection protection** | Cells starting with `=`, `+`, `-` or `@` are escaped so Excel won't run them as formulas. |
 
 ## DevOps
@@ -178,11 +188,12 @@ src/main/resources
 
 | Test | What it covers |
 |---|---|
+| `SplitCalculatorTest` | Equal, exact, percentage and share splits, error messages, and a 200-run randomized test that shares always add up to the total |
 | `BalanceCalculatorTest` | Balances, uneven splits, payers who aren't participants |
 | `SettlementCalculatorTest` | Payment plans, invalid input, and a 200-run randomized property test |
 | `CsvExporterTest` | Quoting and formula-injection escaping |
-| `ExpenseFlowIntegrationTest` | Real services against the real Flyway schema on SQL Server (Testcontainers): create, edit, delete, business rules, users only seeing their own groups |
-| `WebFlowTest` | HTTP requests through MockMvc against SQL Server (Testcontainers) that render the real templates: validation errors, 404 page, CSV download, health check |
+| `ExpenseFlowIntegrationTest` | Real services against the real Flyway schema on SQL Server (Testcontainers): create, edit, delete, business rules, uneven splits saved and reloaded, users only seeing their own groups |
+| `WebFlowTest` | HTTP requests through MockMvc against SQL Server (Testcontainers) that render the real templates: validation errors, splitting by shares through the form, percentages that don't add up, 404 page, CSV download, health check |
 | `SecurityFlowTest` | Sign-up (validation, duplicate email, BCrypt hash), login, wrong password, remember-me cookie, logout, CSRF rejection |
 | `AuthorizationWebTest` | Walks every group, expense, member, invite and export URL as a user who isn't in the group: all 404, nothing changes |
 | `InviteFlowTest` | Creating links, joining as someone new, claiming a name (and keeping its expenses), names that are taken, expired and switched-off links, only a hash stored, signing up from a link and landing back on it, the people-you-share-groups-with list |
@@ -367,6 +378,5 @@ server other people can reach.
 
 ## Ideas for next steps
 
-- Uneven splits (by percentage or exact amounts)
 - Marking a payment as settled, and keeping a history of settlements
 - PDF export of the receipt

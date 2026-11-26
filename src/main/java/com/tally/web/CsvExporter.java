@@ -18,11 +18,14 @@ public class CsvExporter {
     public String export(GroupDashboard group) {
         StringBuilder csv = new StringBuilder();
         row(csv, "Expenses (" + group.currency() + ")");
-        row(csv, "Date", "Description", "Category", "Amount", "Paid by", "Split between");
+        row(csv, "Date", "Description", "Category", "Amount", "Paid by", "Split", "Split between");
         for (ExpenseRow expense : group.expenses()) {
+            String shares = expense.shares().stream()
+                    .map(share -> share.name() + " " + share.amount().toPlainString())
+                    .collect(Collectors.joining("; "));
             row(csv, expense.date().toString(), expense.description(), expense.category().getLabel(),
                     expense.amount().toPlainString(), expense.paidByName(),
-                    String.join("; ", expense.participantNames()));
+                    expense.splitMethod().getLabel(), shares);
         }
 
         csv.append(NEWLINE);

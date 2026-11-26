@@ -10,7 +10,10 @@ import com.tally.service.view.MemberOption;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /** Use cases for adding, editing and removing expenses. Every method checks the user belongs to the group. */
 @Service
@@ -36,8 +39,12 @@ public class ExpenseService {
     public ExpenseCommand details(long userId, long groupId, long expenseId) {
         Expense expense = groups.getForUser(groupId, userId).findExpense(expenseId);
         List<Long> participantIds = expense.getParticipants().stream().map(Member::getId).toList();
+        Map<Long, BigDecimal> weights = new LinkedHashMap<>();
+        if (expense.getSplitMethod().usesWeights()) {
+            expense.getWeights().forEach((member, weight) -> weights.put(member.getId(), weight));
+        }
         return new ExpenseCommand(expense.getDescription(), expense.getAmount(), expense.getCategory(),
-                expense.getDate(), expense.getPaidBy().getId(), participantIds);
+                expense.getDate(), expense.getPaidBy().getId(), participantIds, expense.getSplitMethod(), weights);
     }
 
     /** Records an expense and returns its id. Flushes so the id exists even before the transaction commits. */
@@ -59,10 +66,11 @@ public class ExpenseService {
 
     private static ExpenseDetails toDetails(ExpenseGroup group, ExpenseCommand command) {
         Member payer = group.findMember(command.paidById());
-        List<Member> participants = command.participantIds().stream()
-                .map(group::findMember)
-                .toList();
+        Map<Member, BigDecimal> participants = new LinkedHashMap<>();
+        for (Long id : command.participantIds()) {
+            participants.put(group.findMember(id), command.weights().get(id));
+        }
         return new ExpenseDetails(command.description(), command.amount(), command.category(),
-                command.date(), payer, participants);
+                command.date(), payer, command.splitMethod(), participants);
     }
 }

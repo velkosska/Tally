@@ -95,14 +95,23 @@
                             <span class="expense__meta">
                                 <span class="tag" th:style="'--tag:' + ${e.category.color}"
                                       th:text="${e.category.label}">Food</span>
-                                <span th:text="${e.paidByName + ' paid, split ' + (e.participantNames.size() == 1
+                                <span th:if="${e.equalSplit}"
+                                      th:text="${e.paidByName + ' paid, split ' + (e.participantNames.size() == 1
                                         ? 'with ' + e.participantNames[0] : e.participantNames.size() + ' ways')}"
                                       th:title="${#strings.listJoin(e.participantNames, ', ')}">Carla paid, split 4 ways</span>
+                                <span th:unless="${e.equalSplit}"
+                                      th:text="${e.paidByName + ' paid, split by ' + #strings.toLowerCase(e.splitMethod.label)}">
+                                    Ana paid, split by shares</span>
+                            </span>
+                            <span class="expense__shares muted" th:unless="${e.equalSplit}">
+                                <th:block th:each="s, it : ${e.shares}"><span
+                                        th:text="${s.name + ' ' + @money.format(s.amount, cur)}">Ana €104.73</span><th:block
+                                        th:unless="${it.last}"> · </th:block></th:block>
                             </span>
                         </span>
                         <span class="expense__amount">
                             <span class="amount" th:text="${@money.format(e.amount, cur)}">€142.50</span>
-                            <span class="muted" th:if="${e.participantNames.size() > 1}"
+                            <span class="muted" th:if="${e.equalSplit and e.participantNames.size() > 1}"
                                   th:text="${@money.format(e.perPerson, cur)} + ' each'">€35.63 each</span>
                         </span>
                         <span class="expense__actions">

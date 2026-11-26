@@ -1,13 +1,16 @@
 package com.tally.service;
 
 import com.tally.TestcontainersConfiguration;
+import jakarta.persistence.EntityManager;
 import com.tally.account.AccountService;
 import com.tally.domain.BusinessRuleException;
 import com.tally.domain.Category;
 import com.tally.domain.ExpenseGroupRepository;
 import com.tally.domain.NotFoundException;
 import com.tally.service.view.GroupDashboard;
+import com.tally.service.view.MemberBalance;
 import com.tally.service.view.MemberOption;
+import com.tally.settlement.SplitMethod;
 import com.tally.service.view.Payment;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,9 +23,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 /** Runs the real services against the real schema (Flyway on SQL Server via Testcontainers) to test whole use cases. */
 @SpringBootTest
@@ -41,6 +46,8 @@ class ExpenseFlowIntegrationTest {
     DashboardService dashboardService;
     @Autowired
     ExpenseGroupRepository groups;
+    @Autowired
+    EntityManager entityManager;
 
     /** The logged-in user in each test. Groups they create start with them as the member "Ana". */
     long ana;
@@ -159,9 +166,78 @@ class ExpenseFlowIntegrationTest {
     }
 
     @Test
+    void unevenSplitsAreStoredAndDriveTheBalances() {
+        long groupId = groupService.create(ana, new GroupCommand("Rent", null, "EUR"));
+        long me = memberId(groupId, "Ana");
+        long ben = groupService.addMember(ana, groupId, "Ben");
+
+        long expenseId = expenseService.create(ana, groupId, new ExpenseCommand("Rent", new BigDecimal("1000.00"),
+                Category.UTILITIES, LocalDate.now(), me, List.of(me, ben),
+                SplitMethod.PERCENT, Map.of(me, new BigDecimal("60"), ben, new BigDecimal("40"))));
+        reloadFromDatabase();
+
+        var dashboard = dashboardService.dashboard(ana, groupId);
+        assertThat(dashboard.balances()).extracting(MemberBalance::name, b -> b.net().toPlainString())
+                .containsExactly(tuple("Ana", "400.00"), tuple("Ben", "-400.00"));
+        ExpenseCommand stored = expenseService.details(ana, groupId, expenseId);
+        assertThat(stored.splitMethod()).isEqualTo(SplitMethod.PERCENT);
+        assertThat(stored.weights()).containsOnlyKeys(me, ben);
+        assertThat(stored.weights().get(me)).isEqualByComparingTo("60");
+    }
+
+    @Test
+    void switchingBackToEqualForgetsTheNumbers() {
+        long groupId = groupService.create(ana, new GroupCommand("Rent", null, "EUR"));
+        long me = memberId(groupId, "Ana");
+        long ben = groupService.addMember(ana, groupId, "Ben");
+        long expenseId = expenseService.create(ana, groupId, new ExpenseCommand("Rent", new BigDecimal("90.00"),
+                Category.UTILITIES, LocalDate.now(), me, List.of(me, ben),
+                SplitMethod.EXACT, Map.of(me, new BigDecimal("60.00"), ben, new BigDecimal("30.00"))));
+
+        expenseService.update(ana, groupId, expenseId, expense("Rent", "90.00", me, List.of(me, ben)));
+        reloadFromDatabase();
+
+        assertThat(expenseService.details(ana, groupId, expenseId).weights()).isEmpty();
+        assertThat(dashboardService.dashboard(ana, groupId).balances())
+                .extracting(b -> b.net().toPlainString()).containsExactly("45.00", "-45.00");
+    }
+
+    @Test
+    void exactAmountsThatDoNotAddUpAreRejected() {
+        long groupId = groupService.create(ana, new GroupCommand("Rent", null, "EUR"));
+        long me = memberId(groupId, "Ana");
+        long ben = groupService.addMember(ana, groupId, "Ben");
+
+        assertThatThrownBy(() -> expenseService.create(ana, groupId, new ExpenseCommand("Rent",
+                new BigDecimal("90.00"), Category.UTILITIES, LocalDate.now(), me, List.of(me, ben),
+                SplitMethod.EXACT, Map.of(me, new BigDecimal("60.00")))))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Enter an amount above zero");
+    }
+
+    @Test
     void emailsAreUniqueIgnoringCase() {
         assertThatThrownBy(() -> accountService.signUp(" ANA@Example.com ", "Other Ana", "some password"))
                 .isInstanceOf(BusinessRuleException.class);
+    }
+
+    @Test
+    void equalSplitsSurviveAReloadFromTheDatabase() {
+        long groupId = groupService.create(ana, new GroupCommand("Dinner", null, "EUR"));
+        long me = memberId(groupId, "Ana");
+        long ben = groupService.addMember(ana, groupId, "Ben");
+        expenseService.create(ana, groupId, expense("Pizza", "30.00", me, List.of(me, ben)));
+
+        reloadFromDatabase();
+
+        assertThat(dashboardService.dashboard(ana, groupId).expenses().getFirst().participantNames())
+                .containsExactly("Ana", "Ben");
+    }
+
+    /** Writes everything and forgets the cached entities, so the next read really comes from SQL Server. */
+    private void reloadFromDatabase() {
+        entityManager.flush();
+        entityManager.clear();
     }
 
     private List<Long> memberIds(long groupId) {

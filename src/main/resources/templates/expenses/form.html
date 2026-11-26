@@ -62,20 +62,44 @@
             </div>
         </div>
 
+        <fieldset class="field" th:classappend="${#fields.hasErrors('splitMethod')} ? 'field--error'">
+            <legend>How to split it</legend>
+            <div class="chips">
+                <label class="chip" th:each="sm : ${splitMethods}">
+                    <input type="radio" th:field="*{splitMethod}" th:value="${sm}" data-split-method
+                           th:data-unit="${sm.unit}">
+                    <span th:text="${sm.label}">Equally</span>
+                </label>
+            </div>
+            <p class="field__error" th:errors="*{splitMethod}"></p>
+        </fieldset>
+
         <fieldset class="field" th:classappend="${#fields.hasErrors('participantIds')} ? 'field--error'">
             <legend>
-                Split equally between
+                Between
                 <span class="legend-actions">
                     <button type="button" class="link-btn" data-select="all">Everyone</button>
                     <button type="button" class="link-btn" data-select="none">No one</button>
                 </span>
             </legend>
-            <div class="chips">
-                <label class="chip" th:each="m : ${page.members}">
-                    <input type="checkbox" th:field="*{participantIds}" th:value="${m.id}" data-participant>
-                    <span th:text="${m.name}">Ana</span>
-                </label>
-            </div>
+            <p class="muted split-hint" data-weight-hint>For exact amounts, percentages or shares, fill in a number
+                for each person you tick. With “Equally” the numbers are ignored.</p>
+            <ul class="split-people">
+                <li th:each="m : ${page.members}">
+                    <label class="check split-people__who">
+                        <input type="checkbox" th:field="*{participantIds}" th:value="${m.id}" data-participant>
+                        <span th:text="${m.name}">Ana</span>
+                    </label>
+                    <span class="split-people__weight" data-weight-wrap>
+                        <input type="number" th:field="*{weights[__${m.id}__]}" min="0" step="0.01"
+                               inputmode="decimal" th:aria-label="'Number for ' + ${m.name}" data-weight
+                               th:data-member="${m.id}">
+                        <span class="split-people__unit" data-unit
+                              th:text="${expenseForm.splitMethod != null ? expenseForm.splitMethod.unit : ''}">shares</span>
+                    </span>
+                    <span class="split-people__share" data-share th:data-member="${m.id}"></span>
+                </li>
+            </ul>
             <p class="field__error" th:errors="*{participantIds}"></p>
         </fieldset>
 

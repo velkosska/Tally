@@ -2,6 +2,7 @@ package com.tally.web;
 
 import com.tally.domain.BusinessRuleException;
 import com.tally.domain.Category;
+import com.tally.settlement.SplitMethod;
 import com.tally.service.ExpenseService;
 import com.tally.service.view.ExpenseFormPage;
 import com.tally.web.form.ExpenseForm;
@@ -38,6 +39,11 @@ public class ExpenseController {
     @ModelAttribute("categories")
     Category[] categories() {
         return Category.values();
+    }
+
+    @ModelAttribute("splitMethods")
+    SplitMethod[] splitMethods() {
+        return SplitMethod.values();
     }
 
     @GetMapping("/new")

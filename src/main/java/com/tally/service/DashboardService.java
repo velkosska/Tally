@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -58,8 +59,11 @@ public class DashboardService {
 
     private static List<ExpenseShare> toShares(List<Expense> expenses) {
         return expenses.stream()
-                .map(e -> new ExpenseShare(e.getPaidBy().getId(), e.getAmount(),
-                        e.getParticipants().stream().map(Member::getId).toList()))
+                .map(e -> {
+                    Map<Long, BigDecimal> weights = new HashMap<>();
+                    e.getWeights().forEach((m, w) -> weights.put(m.getId(), w));
+                    return new ExpenseShare(e.getPaidBy().getId(), e.getAmount(), e.getSplitMethod(), weights);
+                })
                 .toList();
     }
 
@@ -111,12 +115,12 @@ public class DashboardService {
     }
 
     private static ExpenseRow toRow(Expense expense) {
-        List<String> participantNames = expense.getParticipants().stream().map(Member::getName).toList();
-        BigDecimal perPerson = expense.getAmount()
-                .divide(BigDecimal.valueOf(participantNames.size()), 2, RoundingMode.HALF_UP);
+        List<ExpenseRow.Share> shares = expense.shares().entrySet().stream()
+                .map(entry -> new ExpenseRow.Share(entry.getKey().getName(), entry.getValue()))
+                .toList();
         return new ExpenseRow(expense.getId(), expense.getDescription(), expense.getAmount(),
                 expense.getCategory(), expense.getDate(), expense.getPaidBy().getName(),
-                participantNames, perPerson);
+                expense.getSplitMethod(), shares);
     }
 
     private static BigDecimal sum(List<BigDecimal> amounts) {

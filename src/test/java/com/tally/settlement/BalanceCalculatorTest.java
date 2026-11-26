@@ -50,11 +50,14 @@ class BalanceCalculatorTest {
     }
 
     @Test
-    void splitEvenlyAlwaysAddsUpToTheTotal() {
-        var shares = BalanceCalculator.splitEvenly(1001, List.of(3L, 1L, 2L));
+    void unevenSplitsUseTheGivenNumbers() {
+        var balances = BalanceCalculator.netBalances(List.of(1L, 2L, 3L), List.of(
+                new ExpenseShare(1, new BigDecimal("90.00"), SplitMethod.SHARES,
+                        Map.of(1L, new BigDecimal("1"), 2L, new BigDecimal("2"), 3L, new BigDecimal("3")))));
 
-        assertThat(shares).containsEntry(1L, 334L).containsEntry(2L, 334L).containsEntry(3L, 333L);
-        assertThat(shares.values().stream().mapToLong(Long::longValue).sum()).isEqualTo(1001);
+        assertThat(balances.get(1L)).isEqualByComparingTo("75.00");
+        assertThat(balances.get(2L)).isEqualByComparingTo("-30.00");
+        assertThat(balances.get(3L)).isEqualByComparingTo("-45.00");
     }
 
     private static BigDecimal sum(Map<Long, BigDecimal> balances) {
