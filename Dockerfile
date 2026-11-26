@@ -11,7 +11,7 @@ RUN mvn -B -q package -DskipTests \
  && java -Djarmode=tools -jar target/tally-*.jar extract --layers --launcher --destination extracted
 
 # ---- Runtime stage: small JRE image, non-root user ----
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
 RUN addgroup -S tally && adduser -S tally -G tally
