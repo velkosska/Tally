@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Not found')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar}"></header>
+
+<main class="wrap page page--narrow error-page">
+    <p class="error-page__code">404</p>
+    <h1>That page doesn’t exist</h1>
+    <p class="lead">The group or expense may have been deleted, or the link is wrong.</p>
+    <a class="btn" th:href="@{/}">Go to your groups</a>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

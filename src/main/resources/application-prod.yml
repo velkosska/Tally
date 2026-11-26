@@ -1,0 +1,15 @@
+# Production: PostgreSQL configured through environment variables, never hard-coded.
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+tally:
+  demo-data:
+    enabled: ${DEMO_DATA:false}

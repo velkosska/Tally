@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(${groupId == null ? 'New group' : 'Edit group'})}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar}"></header>
+
+<main class="wrap page page--narrow">
+    <a class="back" th:href="${groupId == null} ? @{/} : @{/groups/{id}(id=${groupId})}">Back</a>
+
+    <h1 th:text="${groupId == null ? 'New group' : 'Edit group'}">New group</h1>
+    <p class="lead" th:if="${groupId == null}">A group is anything people share costs for: a trip, a flat, a party.</p>
+
+    <form class="form panel" method="post" th:object="${groupForm}"
+          th:action="${groupId == null} ? @{/groups} : @{/groups/{id}(id=${groupId})}" novalidate>
+
+        <div class="field" th:classappend="${#fields.hasErrors('name')} ? 'field--error'">
+            <label for="name">Name</label>
+            <input id="name" type="text" th:field="*{name}" maxlength="80" required autofocus
+                   placeholder="Summer in Lisbon">
+            <p class="field__error" th:errors="*{name}"></p>
+        </div>
+
+        <div class="field" th:classappend="${#fields.hasErrors('description')} ? 'field--error'">
+            <label for="description">Description <span class="optional">optional</span></label>
+            <input id="description" type="text" th:field="*{description}" maxlength="255"
+                   placeholder="Four friends, three days">
+            <p class="field__error" th:errors="*{description}"></p>
+        </div>
+
+        <div class="field field--short" th:classappend="${#fields.hasErrors('currency')} ? 'field--error'">
+            <label for="currency">Currency</label>
+            <select id="currency" th:field="*{currency}">
+                <option th:each="c : ${currencies}" th:value="${c}"
+                        th:text="${c} + ' (' + ${@money.symbol(c)} + ')'">EUR</option>
+            </select>
+            <p class="field__error" th:errors="*{currency}"></p>
+        </div>
+
+        <div class="form__actions">
+            <button class="btn" type="submit" th:text="${groupId == null ? 'Create group' : 'Save changes'}">
+                Create group
+            </button>
+        </div>
+    </form>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

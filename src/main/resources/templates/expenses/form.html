@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(${expenseId == null ? 'Add expense' : 'Edit expense'})}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar}"></header>
+
+<main class="wrap page page--narrow" th:with="isNew=${expenseId == null}">
+    <a class="back" th:href="@{/groups/{id}(id=${page.groupId})}" th:text="${page.groupName}">Lisbon weekend</a>
+
+    <h1 th:text="${isNew ? 'Add expense' : 'Edit expense'}">Add expense</h1>
+
+    <form class="form panel" method="post" th:object="${expenseForm}" novalidate
+          th:action="${isNew} ? @{/groups/{g}/expenses(g=${page.groupId})} : @{/groups/{g}/expenses/{e}(g=${page.groupId},e=${expenseId})}"
+          data-expense-form th:data-currency="${page.currency}">
+
+        <p class="form__error" th:if="${#fields.hasGlobalErrors()}" th:each="err : ${#fields.globalErrors()}"
+           th:text="${err}" role="alert"></p>
+
+        <div class="field-row">
+            <div class="field field--grow" th:classappend="${#fields.hasErrors('description')} ? 'field--error'">
+                <label for="description">What was it for?</label>
+                <input id="description" type="text" th:field="*{description}" maxlength="120" required
+                       placeholder="Dinner at the harbour" th:autofocus="${isNew}">
+                <p class="field__error" th:errors="*{description}"></p>
+            </div>
+
+            <div class="field field--amount" th:classappend="${#fields.hasErrors('amount')} ? 'field--error'">
+                <label for="amount">Amount</label>
+                <div class="money-input">
+                    <span class="money-input__symbol" th:text="${@money.symbol(page.currency)}">€</span>
+                    <input id="amount" type="number" th:field="*{amount}" min="0.01" step="0.01"
+                           inputmode="decimal" required placeholder="0.00" data-amount>
+                </div>
+                <p class="field__error" th:errors="*{amount}"></p>
+            </div>
+        </div>
+
+        <fieldset class="field" th:classappend="${#fields.hasErrors('category')} ? 'field--error'">
+            <legend>Category</legend>
+            <div class="chips">
+                <label class="chip chip--category" th:each="c : ${categories}" th:style="'--tag:' + ${c.color}">
+                    <input type="radio" th:field="*{category}" th:value="${c}">
+                    <span th:text="${c.label}">Food</span>
+                </label>
+            </div>
+            <p class="field__error" th:errors="*{category}"></p>
+        </fieldset>
+
+        <div class="field-row">
+            <div class="field" th:classappend="${#fields.hasErrors('paidById')} ? 'field--error'">
+                <label for="paidById">Paid by</label>
+                <select id="paidById" th:field="*{paidById}">
+                    <option th:each="m : ${page.members}" th:value="${m.id}" th:text="${m.name}">Ana</option>
+                </select>
+                <p class="field__error" th:errors="*{paidById}"></p>
+            </div>
+
+            <div class="field" th:classappend="${#fields.hasErrors('date')} ? 'field--error'">
+                <label for="date">Date</label>
+                <input id="date" type="date" th:field="*{date}" required>
+                <p class="field__error" th:errors="*{date}"></p>
+            </div>
+        </div>
+
+        <fieldset class="field" th:classappend="${#fields.hasErrors('participantIds')} ? 'field--error'">
+            <legend>
+                Split equally between
+                <span class="legend-actions">
+                    <button type="button" class="link-btn" data-select="all">Everyone</button>
+                    <button type="button" class="link-btn" data-select="none">No one</button>
+                </span>
+            </legend>
+            <div class="chips">
+                <label class="chip" th:each="m : ${page.members}">
+                    <input type="checkbox" th:field="*{participantIds}" th:value="${m.id}" data-participant>
+                    <span th:text="${m.name}">Ana</span>
+                </label>
+            </div>
+            <p class="field__error" th:errors="*{participantIds}"></p>
+        </fieldset>
+
+        <p class="split-preview" data-preview aria-live="polite" hidden></p>
+
+        <div class="form__actions">
+            <button class="btn" type="submit" th:text="${isNew ? 'Add expense' : 'Save changes'}">Add expense</button>
+            <a class="btn btn--ghost" th:href="@{/groups/{id}(id=${page.groupId})}">Cancel</a>
+        </div>
+    </form>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

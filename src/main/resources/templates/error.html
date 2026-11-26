@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Something went wrong')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar}"></header>
+
+<main class="wrap page page--narrow error-page">
+    <p class="error-page__code" th:text="${status}">500</p>
+    <h1>Something went wrong</h1>
+    <p class="lead">The request couldn’t be completed. Go back and try again; if it keeps happening, check the server logs.</p>
+    <a class="btn" th:href="@{/}">Go to your groups</a>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

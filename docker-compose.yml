@@ -1,0 +1,34 @@
+# Runs Tally the way it runs in production: the app container plus PostgreSQL.
+#   docker compose up --build      then open http://localhost:8080
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: tally
+      POSTGRES_USER: ${DB_USERNAME:-tally}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-tally-dev-password}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d tally"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://db:5432/tally
+      DB_USERNAME: ${DB_USERNAME:-tally}
+      DB_PASSWORD: ${DB_PASSWORD:-tally-dev-password}
+      DEMO_DATA: ${DEMO_DATA:-true}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  db-data:

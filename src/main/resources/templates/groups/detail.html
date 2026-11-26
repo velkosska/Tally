@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(${group.name})}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar}"></header>
+<div th:replace="~{fragments/layout :: flash}"></div>
+
+<main class="wrap page" th:with="cur=${group.currency}">
+    <a class="back" th:href="@{/}">All groups</a>
+
+    <!-- Header -->
+    <section class="group-head">
+        <div class="group-head__text">
+            <h1 th:text="${group.name}">Lisbon weekend</h1>
+            <p class="lead" th:if="${group.description}" th:text="${group.description}">Description</p>
+        </div>
+        <div class="group-head__actions">
+            <a class="btn" th:href="@{/groups/{id}/expenses/new(id=${group.id})}">Add expense</a>
+            <a class="btn btn--ghost" th:href="@{/groups/{id}/export.csv(id=${group.id})}"
+               th:if="${group.hasExpenses()}" download>Export CSV</a>
+            <a class="btn btn--ghost" th:href="@{/groups/{id}/edit(id=${group.id})}">Edit</a>
+        </div>
+    </section>
+
+    <dl class="totals">
+        <div class="totals__main">
+            <dt>Total spent</dt>
+            <dd class="amount" th:text="${@money.format(group.totalSpent, cur)}">€912.35</dd>
+        </div>
+        <div>
+            <dt>Per person</dt>
+            <dd class="amount" th:text="${@money.format(group.averagePerPerson, cur)}">€228.09</dd>
+        </div>
+        <div>
+            <dt>Expenses</dt>
+            <dd th:text="${group.expenses.size()}">7</dd>
+        </div>
+        <div>
+            <dt>Payments to settle</dt>
+            <dd th:text="${group.settlement.size()}">3</dd>
+        </div>
+    </dl>
+
+    <div class="layout">
+        <!-- Main column -->
+        <div class="layout__main">
+
+            <section class="block" aria-labelledby="balances-heading">
+                <h2 id="balances-heading">Balances</h2>
+                <p class="muted block__hint">What each person paid, minus their share of everything they joined.</p>
+
+                <p class="empty-inline" th:if="${group.balances.isEmpty()}">Add members to see balances.</p>
+
+                <ul class="balances" th:unless="${group.balances.isEmpty()}">
+                    <li class="balance" th:each="b : ${group.balances}"
+                        th:classappend="${b.owed ? 'balance--owed' : (b.owing ? 'balance--owing' : 'balance--even')}">
+                        <span class="balance__name" th:text="${b.name}">Ana</span>
+                        <span class="balance__track" aria-hidden="true">
+                            <span class="balance__bar" th:style="'--size:' + ${b.barPercent} + '%'"></span>
+                        </span>
+                        <span class="balance__value">
+                            <span class="amount" th:text="${@money.format(b.net.abs(), cur)}">€120.00</span>
+                            <span class="balance__label"
+                                  th:text="${b.owed ? 'gets back' : (b.owing ? 'owes' : 'all square')}">gets back</span>
+                        </span>
+                        <span class="balance__detail muted"
+                              th:text="${'Paid ' + @money.format(b.paid, cur) + ', share ' + @money.format(b.share, cur)}">
+                            Paid €474.00, share €354.00
+                        </span>
+                    </li>
+                </ul>
+            </section>
+
+            <section class="block" aria-labelledby="expenses-heading">
+                <div class="section-head">
+                    <h2 id="expenses-heading">Expenses</h2>
+                </div>
+
+                <div class="empty" th:unless="${group.hasExpenses()}">
+                    <p class="empty__title">Nothing spent yet</p>
+                    <p th:if="${group.members.isEmpty()}">Add the people in this group first, then log what they pay for.</p>
+                    <p th:unless="${group.members.isEmpty()}">Log the first thing someone paid for and the balances will appear.</p>
+                    <a class="btn" th:unless="${group.members.isEmpty()}"
+                       th:href="@{/groups/{id}/expenses/new(id=${group.id})}">Add expense</a>
+                </div>
+
+                <ul class="expenses" th:if="${group.hasExpenses()}">
+                    <li class="expense" th:each="e : ${group.expenses}">
+                        <span class="expense__date">
+                            <span th:text="${#temporals.format(e.date, 'd')}">12</span>
+                            <span th:text="${#temporals.format(e.date, 'MMM')}">Nov</span>
+                        </span>
+                        <span class="expense__main">
+                            <span class="expense__title" th:text="${e.description}">Seafood dinner</span>
+                            <span class="expense__meta">
+                                <span class="tag" th:style="'--tag:' + ${e.category.color}"
+                                      th:text="${e.category.label}">Food</span>
+                                <span th:text="${e.paidByName + ' paid, split ' + (e.participantNames.size() == 1
+                                        ? 'with ' + e.participantNames[0] : e.participantNames.size() + ' ways')}"
+                                      th:title="${#strings.listJoin(e.participantNames, ', ')}">Carla paid, split 4 ways</span>
+                            </span>
+                        </span>
+                        <span class="expense__amount">
+                            <span class="amount" th:text="${@money.format(e.amount, cur)}">€142.50</span>
+                            <span class="muted" th:if="${e.participantNames.size() > 1}"
+                                  th:text="${@money.format(e.perPerson, cur)} + ' each'">€35.63 each</span>
+                        </span>
+                        <span class="expense__actions">
+                            <a class="icon-btn" th:href="@{/groups/{g}/expenses/{e}/edit(g=${group.id},e=${e.id})}"
+                               th:aria-label="'Edit ' + ${e.description}" title="Edit">
+                                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13.5 3.5l3 3L7 16H4v-3z"/></svg>
+                            </a>
+                            <form method="post" th:action="@{/groups/{g}/expenses/{e}/delete(g=${group.id},e=${e.id})}"
+                                  th:data-confirm="'Delete “' + ${e.description} + '”?'">
+                                <button class="icon-btn icon-btn--danger" type="submit"
+                                        th:aria-label="'Delete ' + ${e.description}" title="Delete">
+                                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10"/></svg>
+                                </button>
+                            </form>
+                        </span>
+                    </li>
+                </ul>
+            </section>
+        </div>
+
+        <!-- Side column -->
+        <aside class="layout__side">
+
+            <section class="receipt" aria-labelledby="settle-heading">
+                <h2 id="settle-heading" class="receipt__title">Settle up</h2>
+                <p class="receipt__sub" th:text="${group.name}">Lisbon weekend</p>
+
+                <p class="receipt__done" th:if="${group.isSettled()}">
+                    Everyone is square. Nothing to pay.
+                </p>
+
+                <ol class="receipt__lines" th:unless="${group.isSettled()}">
+                    <li th:each="p : ${group.settlement}">
+                        <span class="receipt__who">
+                            <span th:text="${p.fromName}">Ben</span>
+                            <span class="receipt__pays">pays</span>
+                            <span th:text="${p.toName}">Ana</span>
+                        </span>
+                        <mark class="receipt__amount" th:text="${@money.format(p.amount, cur)}">€42.10</mark>
+                    </li>
+                </ol>
+
+                <p class="receipt__foot" th:unless="${group.isSettled()}"
+                   th:text="${group.settlement.size() == 1 ? '1 payment settles everything.'
+                            : group.settlement.size() + ' payments settle everything.'}">
+                    3 payments settle everything.
+                </p>
+            </section>
+
+            <section class="block block--side" aria-labelledby="chart-heading" th:if="${group.hasExpenses()}">
+                <h2 id="chart-heading">Where the money went</h2>
+                <div class="chart">
+                    <canvas id="category-chart" width="220" height="220"
+                            aria-label="Spending by category" role="img"></canvas>
+                </div>
+                <ul class="legend">
+                    <li th:each="c : ${group.categories}">
+                        <span class="legend__dot" th:style="'--tag:' + ${c.color}"></span>
+                        <span class="legend__label" th:text="${c.label}">Food</span>
+                        <span class="legend__value">
+                            <span class="amount" th:text="${@money.format(c.amount, cur)}">€158.10</span>
+                            <span class="muted" th:text="${c.percent} + '%'">17%</span>
+                        </span>
+                    </li>
+                </ul>
+                <script th:inline="javascript">
+                    window.tallyCategories = /*[[${group.categories}]]*/ [];
+                </script>
+            </section>
+
+            <section class="block block--side" id="members" aria-labelledby="members-heading">
+                <h2 id="members-heading">People</h2>
+
+                <ul class="members" th:unless="${group.members.isEmpty()}">
+                    <li th:each="m : ${group.members}">
+                        <span class="avatar" th:text="${#strings.substring(m.name, 0, 1)}">A</span>
+                        <span class="members__name" th:text="${m.name}">Ana</span>
+                        <form method="post" th:if="${m.removable}"
+                              th:action="@{/groups/{g}/members/{m}/delete(g=${group.id},m=${m.id})}"
+                              th:data-confirm="'Remove ' + ${m.name} + ' from the group?'">
+                            <button class="icon-btn icon-btn--danger" type="submit"
+                                    th:aria-label="'Remove ' + ${m.name}" title="Remove">
+                                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+
+                <form class="add-member" method="post" th:action="@{/groups/{id}/members(id=${group.id})}"
+                      th:object="${memberForm}">
+                    <label class="visually-hidden" for="member-name">Name</label>
+                    <input id="member-name" type="text" th:field="*{name}" maxlength="50"
+                           placeholder="Add a person" required>
+                    <button class="btn btn--small" type="submit">Add</button>
+                </form>
+            </section>
+
+            <form class="danger-zone" method="post" th:action="@{/groups/{id}/delete(id=${group.id})}"
+                  th:data-confirm="'Delete ' + ${group.name} + ' and all its expenses? This can’t be undone.'">
+                <button class="link-btn link-btn--danger" type="submit">Delete this group</button>
+            </form>
+        </aside>
+    </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js" defer
+        th:if="${group.hasExpenses()}"></script>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

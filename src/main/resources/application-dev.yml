@@ -1,0 +1,15 @@
+# Local development: in-memory H2 database, demo data, live template reloads.
+spring:
+  datasource:
+    url: jdbc:h2:mem:tally;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+  thymeleaf:
+    cache: false
+
+tally:
+  demo-data:
+    enabled: true

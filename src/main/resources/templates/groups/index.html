@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Your groups')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar}"></header>
+<div th:replace="~{fragments/layout :: flash}"></div>
+
+<main class="wrap page">
+    <section class="intro">
+        <h1 class="intro__title">Who owes whom, worked out for you.</h1>
+        <p class="intro__lead">
+            Log what everyone paid on a trip, in a flat or at dinner.
+            Tally keeps the balances and tells you the fewest payments that settle everything.
+        </p>
+    </section>
+
+    <section aria-labelledby="groups-heading">
+        <div class="section-head">
+            <h2 id="groups-heading">Your groups</h2>
+            <a class="btn" th:href="@{/groups/new}" th:if="${!groups.isEmpty()}">New group</a>
+        </div>
+
+        <div class="empty" th:if="${groups.isEmpty()}">
+            <p class="empty__title">No groups yet</p>
+            <p>Create one for your next trip, your flat or a night out, then add the people sharing costs.</p>
+            <a class="btn" th:href="@{/groups/new}">Create your first group</a>
+        </div>
+
+        <ul class="group-list" th:unless="${groups.isEmpty()}">
+            <li th:each="g : ${groups}">
+                <a class="group-row" th:href="@{/groups/{id}(id=${g.id})}">
+                    <span class="group-row__main">
+                        <span class="group-row__name" th:text="${g.name}">Lisbon weekend</span>
+                        <span class="group-row__desc" th:if="${g.description}" th:text="${g.description}">Trip</span>
+                        <span class="avatars" th:unless="${g.memberNames.isEmpty()}">
+                            <span class="avatar" th:each="n, s : ${g.memberNames}" th:if="${s.index < 5}"
+                                  th:text="${#strings.substring(n, 0, 1)}" th:title="${n}">A</span>
+                            <span class="avatars__more" th:if="${g.memberNames.size() > 5}"
+                                  th:text="'+' + ${g.memberNames.size() - 5}">+2</span>
+                        </span>
+                        <span class="muted" th:if="${g.memberNames.isEmpty()}">No members yet</span>
+                    </span>
+                    <span class="group-row__total">
+                        <span class="amount" th:text="${@money.format(g.totalSpent, g.currency)}">€912.35</span>
+                        <span class="muted"
+                              th:text="${g.expenseCount == 1 ? '1 expense' : g.expenseCount + ' expenses'}">7 expenses</span>
+                    </span>
+                </a>
+            </li>
+        </ul>
+    </section>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

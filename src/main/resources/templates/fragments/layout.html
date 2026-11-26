@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<head th:fragment="head(title)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title} + ' | Tally'">Tally</title>
+    <meta name="description" content="Split shared costs and settle up in as few payments as possible.">
+    <link rel="icon" th:href="@{/favicon.svg}" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;600&display=swap">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script th:src="@{/js/app.js}" defer></script>
+</head>
+
+<body>
+
+<header th:fragment="topbar" class="topbar">
+    <div class="wrap topbar__inner">
+        <a class="brand" th:href="@{/}" aria-label="Tally home">
+            <svg class="brand__mark" viewBox="0 0 40 32" aria-hidden="true">
+                <path d="M6 4v24M13 4v24M20 4v24M27 4v24" />
+                <path class="brand__slash" d="M2 24L33 8" />
+            </svg>
+            <span class="brand__name">Tally</span>
+        </a>
+        <nav class="topbar__nav" aria-label="Main">
+            <a th:href="@{/}">Your groups</a>
+            <a class="btn btn--small" th:href="@{/groups/new}">New group</a>
+        </nav>
+    </div>
+</header>
+
+<div th:fragment="flash" class="toasts" aria-live="polite">
+    <p class="toast toast--success" th:if="${success}" th:text="${success}" role="status"></p>
+    <p class="toast toast--error" th:if="${error}" th:text="${error}" role="alert"></p>
+</div>
+
+<footer th:fragment="footer" class="footer">
+    <div class="wrap">
+        <p>Tally works out who owes whom, then settles it in as few payments as possible.</p>
+    </div>
+</footer>
+
+</body>
+</html>
