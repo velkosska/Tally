@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(${expense.description})}"></head>
+<body>
+<header th:replace="~{fragments/layout :: topbar}"></header>
+<div th:replace="~{fragments/layout :: flash}"></div>
+
+<main class="wrap page page--narrow expense-page" th:with="cur=${currency}, e=${expense}">
+    <a class="back" th:href="@{/groups/{id}(id=${groupId})}" th:text="${groupName}">Lisbon weekend</a>
+
+    <section class="group-head">
+        <div class="group-head__text">
+            <h1 th:text="${e.description}">Seafood dinner</h1>
+            <p class="lead">
+                <span class="amount" th:text="${@money.format(e.amount, cur)}">€142.50</span>
+                <span class="muted" th:text="${'paid by ' + e.paidByName + ' on ' + #temporals.format(e.date, 'd MMM yyyy')}">
+                    paid by Carla on 15 Nov 2026</span>
+            </p>
+        </div>
+        <div class="group-head__actions">
+            <a class="btn btn--ghost" th:href="@{/groups/{g}/expenses/{x}/edit(g=${groupId},x=${e.id})}">Edit</a>
+        </div>
+    </section>
+
+    <section class="block" aria-labelledby="split-heading">
+        <h2 id="split-heading" th:text="${e.equalSplit ? 'Split equally' : 'Split by ' + #strings.toLowerCase(e.splitMethod.label)}">
+            Split equally</h2>
+        <ul class="share-list">
+            <li th:each="s : ${e.shares}">
+                <span class="avatar" th:text="${#strings.substring(s.name, 0, 1)}">A</span>
+                <span class="share-list__name" th:text="${s.name}">Ana</span>
+                <span class="amount" th:text="${@money.format(s.amount, cur)}">€35.63</span>
+            </li>
+        </ul>
+        <p class="muted"><span class="tag" th:style="'--tag:' + ${e.category.color}" th:text="${e.category.label}">Food</span></p>
+    </section>
+
+    <section class="block" id="receipt" aria-labelledby="receipt-heading">
+        <h2 id="receipt-heading">Receipt</h2>
+
+        <div class="receipt-file" th:if="${receipt}">
+            <a th:if="${receipt.image}" class="receipt-file__preview"
+               th:href="@{/groups/{g}/expenses/{x}/receipt(g=${groupId},x=${e.id})}" target="_blank" rel="noopener">
+                <img th:src="@{/groups/{g}/expenses/{x}/receipt(g=${groupId},x=${e.id})}"
+                     th:alt="'Receipt for ' + ${e.description}" loading="lazy">
+            </a>
+            <div class="receipt-file__meta">
+                <span class="receipt-file__name" th:text="${receipt.fileName}">receipt.jpg</span>
+                <span class="muted" th:text="${receipt.size()} + ' · added ' + ${@when.ago(receipt.uploadedAt)}">
+                    245 KB · added 5 min ago</span>
+                <span class="receipt-file__actions">
+                    <a class="link-btn" th:href="@{/groups/{g}/expenses/{x}/receipt(g=${groupId},x=${e.id},download=true)}">Download</a>
+                    <form method="post" th:action="@{/groups/{g}/expenses/{x}/receipt/delete(g=${groupId},x=${e.id})}"
+                          data-confirm="Remove this receipt?">
+                        <button class="link-btn link-btn--danger" type="submit">Remove</button>
+                    </form>
+                </span>
+            </div>
+        </div>
+
+        <form class="upload" method="post" enctype="multipart/form-data"
+              th:action="@{/groups/{g}/expenses/{x}/receipt(g=${groupId},x=${e.id})}">
+            <label for="receipt-file" th:text="${receipt} ? 'Replace it with another photo or PDF' : 'Add a photo or PDF of the receipt'">
+                Add a photo or PDF of the receipt</label>
+            <div class="upload__row">
+                <input id="receipt-file" name="file" type="file" required
+                       accept="image/jpeg,image/png,image/webp,application/pdf">
+                <button class="btn btn--small" type="submit">Upload</button>
+            </div>
+            <p class="muted">JPEG, PNG, WebP or PDF, up to 5 MB. Everyone in the group can see it.</p>
+        </form>
+    </section>
+
+    <section class="block" id="comments" aria-labelledby="comments-heading">
+        <h2 id="comments-heading" th:text="${comments.isEmpty() ? 'Comments' : 'Comments (' + comments.size() + ')'}">Comments</h2>
+
+        <p class="empty-inline" th:if="${comments.isEmpty()}">No comments yet. Ask about the bill or leave a note.</p>
+        <ol class="comments" th:unless="${comments.isEmpty()}">
+            <li class="comment" th:each="c : ${comments}" th:classappend="${c.byYou} ? 'comment--mine'">
+                <div class="comment__head">
+                    <strong th:text="${c.who()}">Ana</strong>
+                    <time class="muted" th:datetime="${c.at}" th:title="${@when.exact(c.at)}"
+                          th:text="${@when.ago(c.at)}">5 min ago</time>
+                    <form th:if="${c.byYou}" method="post" data-confirm="Delete your comment?"
+                          th:action="@{/groups/{g}/expenses/{x}/comments/{c}/delete(g=${groupId},x=${e.id},c=${c.id})}">
+                        <button class="link-btn link-btn--danger" type="submit">Delete</button>
+                    </form>
+                </div>
+                <p class="comment__body" th:text="${c.body}">Did this include the tip?</p>
+            </li>
+        </ol>
+
+        <form class="comment-form" method="post" th:action="@{/groups/{g}/expenses/{x}/comments(g=${groupId},x=${e.id})}">
+            <label class="visually-hidden" for="comment-body">Your comment</label>
+            <textarea id="comment-body" name="body" rows="3" required th:maxlength="${maxCommentLength}"
+                      placeholder="Write a comment" th:text="${draft}"></textarea>
+            <button class="btn btn--small" type="submit">Post comment</button>
+        </form>
+    </section>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

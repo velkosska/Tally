@@ -10,10 +10,13 @@ import java.util.List;
 /**
  * An expense as listed on the group page and in the CSV export.
  *
- * @param shares what each participant pays, in name order; adds up to the amount
+ * @param shares       what each participant pays, in name order; adds up to the amount
+ * @param hasReceipt   whether a receipt photo or PDF is attached
+ * @param commentCount how many comments the expense has
  */
 public record ExpenseRow(long id, String description, BigDecimal amount, Category category,
-                         LocalDate date, String paidByName, SplitMethod splitMethod, List<Share> shares) {
+                         LocalDate date, String paidByName, SplitMethod splitMethod, List<Share> shares,
+                         boolean hasReceipt, long commentCount) {
 
     public List<String> participantNames() {
         return shares.stream().map(Share::name).toList();

@@ -29,6 +29,10 @@ JUnit 5 · Testcontainers · Docker · GitHub Actions · Azure App Service
 - **Activity feed**: every group keeps a history of who added, edited or deleted what, and when ("Ana edited
   “Dinner”: amount 90.00 → 96.00"). The group page shows the latest changes with a link to the full, paged
   history, and the home page shows the latest changes across all your groups.
+- **Expense page, receipts and comments**: click an expense to see how it was split, attach a photo or PDF of the
+  receipt (JPEG, PNG, WebP or PDF, up to 5 MB, one per expense) and talk about it in comments ("Did this include
+  the tip?"). Anyone in the group can replace or remove the receipt; only the author can delete a comment. The
+  group page marks expenses that have a receipt or comments.
 - **Spending by category**: a doughnut chart plus a table.
 - **CSV export**: expenses (with how each was split and everyone's part), balances, payments made and the
   payment plan, ready for Excel.
@@ -146,6 +150,8 @@ src/main/java/com/tally
 ├── account/       AppUser, AccountService (sign-up, BCrypt password hashes)
 ├── invite/        GroupInvite (a share link), InviteService (create, switch off, join, claim a name)
 ├── activity/      Activity (one feed entry), ActivityLog (writes and reads the feed), ExpenseSnapshot (edit diffs)
+├── receipt/       Receipt (the file, stored in the database), ReceiptType (checks the file's bytes), ReceiptService
+├── comment/       Comment, CommentService (add, list, delete your own)
 ├── security/      SecurityConfig, TallyUser (the logged-in user), user lookup, login after sign-up
 ├── domain/        ExpenseGroup (aggregate root), Member (optionally linked to a user), Expense, Category, repository
 ├── settlement/    SplitCalculator, BalanceCalculator, SettlementCalculator (the algorithms)
@@ -168,7 +174,9 @@ src/main/resources
 | **Invite links store only a hash** | A link holds 32 random bytes. The database keeps their SHA-256 hash, so someone who reads the database still can't join groups. Unknown, expired and switched-off links all show the same "doesn't work any more" page. |
 | **Claiming a name instead of merging people** | People are often added by name before they have an account. Joining through a link can link the account to that existing member, so the expenses already logged for them stay correct. Only members without an account can be claimed. |
 | **Activity written in the same transaction** | Services call `ActivityLog.record` inside their own transaction (it refuses to run without one), so a change and its feed entry are saved together or not at all. Entries copy names and amounts, so "Ana deleted “Taxi”" still reads correctly after the expense is gone. |
-| **Remember-me tokens in the database** | "Keep me logged in" uses Spring Security's persistent tokens (`persistent_logins` table): the cookie holds a random token, not the password hash, it rotates on every use and can be revoked. |
+| **Receipts stored in the database** | One `varbinary(max)` row per expense, so there is no file storage to set up, back up or secure separately, and a receipt goes away with its expense (`on delete cascade`). The 5 MB limit keeps the free Azure SQL tier (32 GB) comfortable; moving to Blob Storage later only changes `ReceiptService`. Pages read only the file name, type and size through a projection; the bytes are read only when someone opens the receipt. |
+| **Receipt files are checked by their bytes** | The type comes from the file's first bytes ("magic numbers"), not from its name or what the browser claims, so a renamed HTML or SVG file is refused. Files are sent with `nosniff`, a `sandbox` Content-Security-Policy and `no-store`, images open inline and PDFs always download, and the file name is cleaned before it goes in a header. |
+ in the database** | "Keep me logged in" uses Spring Security's persistent tokens (`persistent_logins` table): the cookie holds a random token, not the password hash, it rotates on every use and can be revoked. |
 | **Algorithm is framework-free** | `settlement/` is plain Java: fast to unit-test and easy to explain. |
 | **Money in cents / `BigDecimal`** | Floating point can't represent most decimal amounts exactly. |
 | **Flyway + `ddl-auto: validate`** | The schema is versioned SQL, and Hibernate checks that the entities match it at startup. |
@@ -206,9 +214,11 @@ src/main/resources
 | `ExpenseFlowIntegrationTest` | Real services against the real Flyway schema on SQL Server (Testcontainers): create, edit, delete, business rules, uneven splits saved and reloaded, users only seeing their own groups |
 | `WebFlowTest` | HTTP requests through MockMvc against SQL Server (Testcontainers) that render the real templates: validation errors, splitting by shares through the form, percentages that don't add up, 404 page, CSV download, health check |
 | `SecurityFlowTest` | Sign-up (validation, duplicate email, BCrypt hash), login, wrong password, remember-me cookie, logout, CSRF rejection |
-| `AuthorizationWebTest` | Walks every group, expense, member, invite, payment, activity and export URL as a user who isn't in the group: all 404, nothing changes |
+| `AuthorizationWebTest` | Walks every group, expense, member, invite, payment, activity, export, receipt and comment URL as a user who isn't in the group: all 404, nothing changes |
 | `RepaymentFlowTest` | Recording payments moves balances and shrinks the plan, paying everything back settles the group, deleting, "Mark as paid", bad input, outsiders get 404 |
 | `ActivityFeedTest` | Every kind of change is recorded newest first, edits say what changed, joining through an invite, names kept after deletes, outsiders get 404, the feed goes with a deleted group, paging |
+| `ExpenseDetailFlowTest` | The expense page, uploading and serving receipts (headers, inline vs download), files refused by their bytes, empty and too-large files, replacing and removing, comments (delete your own only, blank and too long), badges on the group page, feed entries, everything going with a deleted expense or group |
+| `ReceiptTypeTest` | Recognising JPEG, PNG, WebP and PDF by their bytes, refusing everything else, cleaning file names |
 | `TimeAgoTest` | "5 min ago", "yesterday" and dates for older entries |
 | `InviteFlowTest` | Creating links, joining as someone new, claiming a name (and keeping its expenses), names that are taken, expired and switched-off links, only a hash stored, signing up from a link and landing back on it, the people-you-share-groups-with list |
 

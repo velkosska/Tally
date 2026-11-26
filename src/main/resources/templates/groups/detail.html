@@ -93,7 +93,19 @@
                             <span th:text="${#temporals.format(e.date, 'MMM')}">Nov</span>
                         </span>
                         <span class="expense__main">
-                            <span class="expense__title" th:text="${e.description}">Seafood dinner</span>
+                            <a class="expense__title" th:href="@{/groups/{g}/expenses/{x}(g=${group.id},x=${e.id})}">
+                                <span th:text="${e.description}">Seafood dinner</span>
+                                <span class="expense__badge" th:if="${e.hasReceipt}" title="Has a receipt"
+                                      aria-label="has a receipt">
+                                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13 6l-6 6a2 2 0 0 0 3 3l7-7a4 4 0 0 0-6-6l-7 7a6 6 0 0 0 8 8l5-5"/></svg>
+                                </span>
+                                <span class="expense__badge" th:if="${e.commentCount > 0}"
+                                      th:title="${e.commentCount == 1 ? '1 comment' : e.commentCount + ' comments'}"
+                                      th:aria-label="${e.commentCount == 1 ? '1 comment' : e.commentCount + ' comments'}">
+                                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4h12v9H9l-4 3v-3H4z"/></svg>
+                                    <span th:text="${e.commentCount}">2</span>
+                                </span>
+                            </a>
                             <span class="expense__meta">
                                 <span class="tag" th:style="'--tag:' + ${e.category.color}"
                                       th:text="${e.category.label}">Food</span>

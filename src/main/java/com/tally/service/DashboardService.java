@@ -1,6 +1,8 @@
 package com.tally.service;
 
+import com.tally.comment.CommentService;
 import com.tally.domain.Category;
+import com.tally.receipt.ReceiptRepository;
 import com.tally.domain.Expense;
 import com.tally.domain.ExpenseGroup;
 import com.tally.domain.ExpenseGroupRepository;
@@ -27,6 +29,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /** Builds the group page: balances, the settle-up plan, category totals and the expense list. */
@@ -35,9 +38,21 @@ import java.util.stream.Collectors;
 public class DashboardService {
 
     private final ExpenseGroupRepository groups;
+    private final ReceiptRepository receipts;
+    private final CommentService comments;
 
-    public DashboardService(ExpenseGroupRepository groups) {
+    public DashboardService(ExpenseGroupRepository groups, ReceiptRepository receipts, CommentService comments) {
         this.groups = groups;
+        this.receipts = receipts;
+        this.comments = comments;
+    }
+
+    /** One expense as listed on the group page, for the expense's own page. */
+    public ExpenseRow expenseRow(long userId, long groupId, long expenseId) {
+        ExpenseGroup group = groups.getForUser(groupId, userId);
+        Expense expense = group.findExpense(expenseId);
+        return toRow(expense, Set.copyOf(receipts.findExpenseIdsWithReceipt(groupId)),
+                comments.countsForGroup(groupId));
     }
 
     public GroupDashboard dashboard(long userId, long groupId) {
@@ -52,6 +67,8 @@ public class DashboardService {
                 .toList();
         Map<Long, BigDecimal> net = BalanceCalculator.netBalances(names.keySet(), toShares(expenses), paymentsMade);
         BigDecimal total = sum(expenses.stream().map(Expense::getAmount).toList());
+        Set<Long> withReceipt = Set.copyOf(receipts.findExpenseIdsWithReceipt(groupId));
+        Map<Long, Long> commentCounts = comments.countsForGroup(groupId);
 
         return new GroupDashboard(
                 group.getId(), group.getName(), group.getDescription(), group.getCurrency(),
@@ -60,7 +77,7 @@ public class DashboardService {
                 balances(members, expenses, paymentsMade, net),
                 settlement(net, names),
                 categoryTotals(expenses, total),
-                expenses.stream().map(DashboardService::toRow).toList(),
+                expenses.stream().map(e -> toRow(e, withReceipt, commentCounts)).toList(),
                 repayments.stream().map(DashboardService::toRepaymentRow).toList());
     }
 
@@ -132,13 +149,14 @@ public class DashboardService {
                 .toList();
     }
 
-    private static ExpenseRow toRow(Expense expense) {
+    private static ExpenseRow toRow(Expense expense, Set<Long> withReceipt, Map<Long, Long> commentCounts) {
         List<ExpenseRow.Share> shares = expense.shares().entrySet().stream()
                 .map(entry -> new ExpenseRow.Share(entry.getKey().getName(), entry.getValue()))
                 .toList();
         return new ExpenseRow(expense.getId(), expense.getDescription(), expense.getAmount(),
                 expense.getCategory(), expense.getDate(), expense.getPaidBy().getName(),
-                expense.getSplitMethod(), shares);
+                expense.getSplitMethod(), shares, withReceipt.contains(expense.getId()),
+                commentCounts.getOrDefault(expense.getId(), 0L));
     }
 
     private static RepaymentRow toRepaymentRow(Repayment repayment) {

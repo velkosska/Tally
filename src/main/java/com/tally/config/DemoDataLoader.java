@@ -4,6 +4,8 @@ import com.tally.account.AppUser;
 import com.tally.activity.ActivityLog;
 import com.tally.activity.ActivityType;
 import com.tally.account.AppUserRepository;
+import com.tally.comment.CommentService;
+import com.tally.domain.Expense;
 import com.tally.domain.Category;
 import com.tally.domain.Expense.ExpenseDetails;
 import com.tally.domain.ExpenseGroup;
@@ -49,13 +51,15 @@ public class DemoDataLoader implements ApplicationRunner {
     private final AppUserRepository users;
     private final PasswordEncoder passwordEncoder;
     private final ActivityLog activityLog;
+    private final CommentService commentService;
 
     public DemoDataLoader(ExpenseGroupRepository groups, AppUserRepository users, PasswordEncoder passwordEncoder,
-                          ActivityLog activityLog) {
+                          ActivityLog activityLog, CommentService commentService) {
         this.groups = groups;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.activityLog = activityLog;
+        this.commentService = commentService;
     }
 
     @Override
@@ -95,7 +99,7 @@ public class DemoDataLoader implements ApplicationRunner {
         trip.addExpense(new ExpenseDetails("Apartment in Alfama", new BigDecimal("384.00"), Category.ACCOMMODATION,
                 start, ana, SplitMethod.SHARES, nights));
         add(trip, "Flights to Lisbon", "236.80", Category.TRANSPORT, start, ben, all);
-        add(trip, "Seafood dinner at the harbour", "142.50", Category.FOOD, start.plusDays(1), carla, all);
+        Expense dinner = add(trip, "Seafood dinner at the harbour", "142.50", Category.FOOD, start.plusDays(1), carla, all);
         add(trip, "Tram 28 tickets", "12.00", Category.TRANSPORT, start.plusDays(1), dani, List.of(ana, dani, ben));
         add(trip, "Fado show", "90.00", Category.ENTERTAINMENT, start.plusDays(1), ana, List.of(ana, carla, dani));
         add(trip, "Pastéis de nata (again)", "15.60", Category.FOOD, start.plusDays(2), ben, all);
@@ -109,6 +113,12 @@ public class DemoDataLoader implements ApplicationRunner {
                 new BigDecimal("15.60"), "paid by Ben, split equally between Ana, Ben, Carla, Dani");
         activityLog.record(trip, anaUser.getId(), ActivityType.PAYMENT_RECORDED, "Dani paid Ana",
                 new BigDecimal("50.00"), "Bank transfer");
+
+        // A short conversation, so the comments on an expense page aren't empty either.
+        groups.flush();
+        commentService.add(benUser.getId(), trip.getId(), dinner.getId(), "Did this include the tip?");
+        commentService.add(anaUser.getId(), trip.getId(), dinner.getId(),
+                "Yes, Carla added 10% before splitting.");
     }
 
     private void createFlat(AppUser anaUser) {
@@ -125,11 +135,11 @@ public class DemoDataLoader implements ApplicationRunner {
         add(flat, "Weekly groceries", "64.20", Category.GROCERIES, today.minusDays(3), sam, all);
     }
 
-    private static void add(ExpenseGroup group, String description, String amount, Category category,
+    private static Expense add(ExpenseGroup group, String description, String amount, Category category,
                             LocalDate date, Member paidBy, List<Member> participants) {
         Map<Member, BigDecimal> equally = new LinkedHashMap<>();
         participants.forEach(member -> equally.put(member, null));
-        group.addExpense(new ExpenseDetails(description, new BigDecimal(amount), category,
+        return group.addExpense(new ExpenseDetails(description, new BigDecimal(amount), category,
                 date, paidBy, SplitMethod.EQUAL, equally));
     }
 }
