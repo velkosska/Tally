@@ -836,6 +836,21 @@ a {
     font-weight: 600;
 }
 
+.receipt__lines li {
+    flex-wrap: wrap;
+}
+
+.receipt__paid {
+    flex-basis: 100%;
+    margin: -0.2rem 0 0;
+    text-align: right;
+}
+
+.receipt__paid .link-btn {
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+}
+
 .receipt__foot,
 .receipt__done {
     padding-top: 0.85rem;
@@ -1292,6 +1307,67 @@ select:focus-visible {
 .split-preview--off {
     border-left-color: var(--owes);
     background: var(--owes-tint);
+}
+
+/* ---------- Payments made ---------- */
+
+.repayments {
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+}
+
+.repayment {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--rule);
+}
+
+.repayment form {
+    margin: 0;
+}
+
+.repayment__main {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.record-payment summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.record-payment summary::-webkit-details-marker {
+    display: none;
+}
+
+.record-payment[open] summary {
+    margin-bottom: 1rem;
+}
+
+.record-payment__form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem 1rem;
+    padding: 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--paper-raised);
+}
+
+.record-payment__note,
+.record-payment__form .form__actions {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 600px) {
+    .record-payment__form {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 /* ---------- Uneven splits ---------- */

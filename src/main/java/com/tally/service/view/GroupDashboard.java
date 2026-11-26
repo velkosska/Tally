@@ -8,10 +8,14 @@ public record GroupDashboard(long id, String name, String description, String cu
                              BigDecimal totalSpent, BigDecimal averagePerPerson,
                              List<MemberOption> members, List<MemberBalance> balances,
                              List<Payment> settlement, List<CategoryTotal> categories,
-                             List<ExpenseRow> expenses) {
+                             List<ExpenseRow> expenses, List<RepaymentRow> repayments) {
 
     public boolean hasExpenses() {
         return !expenses.isEmpty();
+    }
+
+    public boolean hasRepayments() {
+        return !repayments.isEmpty();
     }
 
     public boolean isSettled() {

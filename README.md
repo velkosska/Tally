@@ -23,9 +23,12 @@ JUnit 5 · Testcontainers · Docker · GitHub Actions · Azure App Service
   stayed). The form shows each person's part as you type and says when amounts or percentages don't add up.
 - **Balances**: a diverging bar chart showing who is owed and who owes.
 - **Settle up**: the minimum-payment plan, shown as a receipt.
+- **Record payments**: press "Mark as paid" on a line of the plan, or record any payment by hand ("Ben paid Ana
+  €20, bank transfer"). Payments move both people's balances, the plan shrinks, and the group page keeps a
+  history of payments made that you can delete from if one was entered by mistake.
 - **Spending by category**: a doughnut chart plus a table.
-- **CSV export**: expenses (with how each was split and everyone's part), balances and the payment plan,
-  ready for Excel.
+- **CSV export**: expenses (with how each was split and everyone's part), balances, payments made and the
+  payment plan, ready for Excel.
 - Validation with friendly messages, a confirmation before deleting anything, custom 404 and error pages,
   and a responsive layout that works on phones.
 
@@ -51,7 +54,8 @@ The `dev` profile creates two demo accounts, both with the password `tally-demo`
 
 To try invites, open a group as Ana, click **Create invite link** under *Invite people*, and open the link in a
 private window. Sign up there and you can claim "Carla" or "Dani", who were added by name.
-In "Lisbon weekend", the apartment is split by shares (nights stayed), so you can see an uneven split right away.
+In "Lisbon weekend", the apartment is split by shares (nights stayed) and Dani has already paid Ana €50 back, so
+you can see an uneven split and a recorded payment right away.
 
 Or create your own account at <http://localhost:8080/signup>. Data is kept in the `db-data` Docker volume
 between runs; `docker compose down -v` wipes it. (Groups created before accounts existed belong to nobody and
@@ -84,7 +88,9 @@ run the real Flyway migrations on it and remove it afterwards.
 This is the interesting part of the project, so it lives in its own package (`com.tally.settlement`)
 with no Spring or database code, which makes it easy to test.
 
-**Step 1: net balances.** For each person, `balance = what they paid − their share of what they took part in`.
+**Step 1: net balances.** For each person, `balance = what they paid − their share of what they took part in
++ what they paid back − what they were paid back`. A recorded payment works like an expense the payer covered
+for exactly one person, the receiver.
 Positive means the group owes them; negative means they owe the group. All balances always add up to zero.
 
 **Step 2: splitting to the cent.** Money is never stored as `double`, because `0.1 + 0.2 != 0.3` in
@@ -189,13 +195,14 @@ src/main/resources
 | Test | What it covers |
 |---|---|
 | `SplitCalculatorTest` | Equal, exact, percentage and share splits, error messages, and a 200-run randomized test that shares always add up to the total |
-| `BalanceCalculatorTest` | Balances, uneven splits, payers who aren't participants |
+| `BalanceCalculatorTest` | Balances, uneven splits, payers who aren't participants, payments made |
 | `SettlementCalculatorTest` | Payment plans, invalid input, and a 200-run randomized property test |
 | `CsvExporterTest` | Quoting and formula-injection escaping |
 | `ExpenseFlowIntegrationTest` | Real services against the real Flyway schema on SQL Server (Testcontainers): create, edit, delete, business rules, uneven splits saved and reloaded, users only seeing their own groups |
 | `WebFlowTest` | HTTP requests through MockMvc against SQL Server (Testcontainers) that render the real templates: validation errors, splitting by shares through the form, percentages that don't add up, 404 page, CSV download, health check |
 | `SecurityFlowTest` | Sign-up (validation, duplicate email, BCrypt hash), login, wrong password, remember-me cookie, logout, CSRF rejection |
-| `AuthorizationWebTest` | Walks every group, expense, member, invite and export URL as a user who isn't in the group: all 404, nothing changes |
+| `AuthorizationWebTest` | Walks every group, expense, member, invite, payment and export URL as a user who isn't in the group: all 404, nothing changes |
+| `RepaymentFlowTest` | Recording payments moves balances and shrinks the plan, paying everything back settles the group, deleting, "Mark as paid", bad input, outsiders get 404 |
 | `InviteFlowTest` | Creating links, joining as someone new, claiming a name (and keeping its expenses), names that are taken, expired and switched-off links, only a hash stored, signing up from a link and landing back on it, the people-you-share-groups-with list |
 
 ## Deploy to Azure
@@ -378,5 +385,4 @@ server other people can reach.
 
 ## Ideas for next steps
 
-- Marking a payment as settled, and keeping a history of settlements
 - PDF export of the receipt

@@ -95,6 +95,8 @@ public class DemoDataLoader implements ApplicationRunner {
         add(trip, "Fado show", "90.00", Category.ENTERTAINMENT, start.plusDays(1), ana, List.of(ana, carla, dani));
         add(trip, "Pastéis de nata (again)", "15.60", Category.FOOD, start.plusDays(2), ben, all);
         add(trip, "Supermarket breakfast run", "31.45", Category.GROCERIES, start.plusDays(2), dani, all);
+        trip.recordRepayment(dani.getId(), ana.getId(), new BigDecimal("50.00"), start.plusDays(4),
+                "Bank transfer", null);
     }
 
     private void createFlat(AppUser anaUser) {

@@ -12,7 +12,9 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Currency;
@@ -49,6 +51,10 @@ public class ExpenseGroup {
     @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("name ASC")
     private List<Member> members = new ArrayList<>();
+
+    @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("date DESC, id DESC")
+    private List<Repayment> repayments = new ArrayList<>();
 
     protected ExpenseGroup() {
         // for JPA
@@ -120,6 +126,10 @@ public class ExpenseGroup {
             throw new BusinessRuleException(member.getName()
                     + " is part of existing expenses. Remove or edit those expenses first.");
         }
+        if (repayments.stream().anyMatch(repayment -> repayment.involves(member))) {
+            throw new BusinessRuleException(member.getName()
+                    + " is part of recorded payments. Delete those payments first.");
+        }
         members.remove(member);
     }
 
@@ -148,9 +158,10 @@ public class ExpenseGroup {
         expenses.remove(findExpense(expenseId));
     }
 
-    /** Deletes every expense; used before deleting the group so rows go away in a safe order. */
+    /** Deletes every expense and payment; used before deleting the group so rows go away in a safe order. */
     public void removeAllExpenses() {
         expenses.clear();
+        repayments.clear();
     }
 
     public Expense findExpense(long expenseId) {
@@ -170,6 +181,32 @@ public class ExpenseGroup {
             throw new BusinessRuleException("Everyone on an expense must be a member of this group.");
         }
         Expense.checkSplit(details);
+    }
+
+    // ---- repayments ----
+
+    /** Records that one member paid another back, which moves both their balances. */
+    public Repayment recordRepayment(long fromMemberId, long toMemberId, BigDecimal amount, LocalDate date,
+                                     String note, AppUser recordedBy) {
+        Member from = findMember(fromMemberId);
+        Member to = findMember(toMemberId);
+        if (from.equals(to)) {
+            throw new BusinessRuleException("Pick two different people: someone can't pay themselves back.");
+        }
+        if (amount == null || amount.signum() <= 0) {
+            throw new BusinessRuleException("The amount must be at least 0.01.");
+        }
+        Repayment repayment = new Repayment(this, from, to, amount, date, note, recordedBy);
+        repayments.add(repayment);
+        return repayment;
+    }
+
+    public void removeRepayment(long repaymentId) {
+        Repayment repayment = repayments.stream()
+                .filter(r -> r.getId() != null && r.getId() == repaymentId)
+                .findFirst()
+                .orElseThrow(() -> new NotFoundException("Payment", repaymentId));
+        repayments.remove(repayment);
     }
 
     // ---- getters ----
@@ -200,5 +237,10 @@ public class ExpenseGroup {
 
     public List<Expense> getExpenses() {
         return Collections.unmodifiableList(expenses);
+    }
+
+    /** Recorded payments between members, newest first. */
+    public List<Repayment> getRepayments() {
+        return Collections.unmodifiableList(repayments);
     }
 }

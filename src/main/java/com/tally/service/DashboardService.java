@@ -5,12 +5,14 @@ import com.tally.domain.Expense;
 import com.tally.domain.ExpenseGroup;
 import com.tally.domain.ExpenseGroupRepository;
 import com.tally.domain.Member;
+import com.tally.domain.Repayment;
 import com.tally.service.view.CategoryTotal;
 import com.tally.service.view.ExpenseRow;
 import com.tally.service.view.GroupDashboard;
 import com.tally.service.view.MemberBalance;
 import com.tally.service.view.MemberOption;
 import com.tally.service.view.Payment;
+import com.tally.service.view.RepaymentRow;
 import com.tally.settlement.BalanceCalculator;
 import com.tally.settlement.ExpenseShare;
 import com.tally.settlement.SettlementCalculator;
@@ -44,17 +46,22 @@ public class DashboardService {
         List<Expense> expenses = group.getExpenses();
         Map<Long, String> names = members.stream().collect(Collectors.toMap(Member::getId, Member::getName));
 
-        Map<Long, BigDecimal> net = BalanceCalculator.netBalances(names.keySet(), toShares(expenses));
+        List<Repayment> repayments = group.getRepayments();
+        List<Transfer> paymentsMade = repayments.stream()
+                .map(r -> new Transfer(r.getFrom().getId(), r.getTo().getId(), r.getAmount()))
+                .toList();
+        Map<Long, BigDecimal> net = BalanceCalculator.netBalances(names.keySet(), toShares(expenses), paymentsMade);
         BigDecimal total = sum(expenses.stream().map(Expense::getAmount).toList());
 
         return new GroupDashboard(
                 group.getId(), group.getName(), group.getDescription(), group.getCurrency(),
                 total, average(total, members.size()),
-                memberOptions(members, expenses, userId),
-                balances(members, expenses, net),
+                memberOptions(members, expenses, repayments, userId),
+                balances(members, expenses, paymentsMade, net),
                 settlement(net, names),
                 categoryTotals(expenses, total),
-                expenses.stream().map(DashboardService::toRow).toList());
+                expenses.stream().map(DashboardService::toRow).toList(),
+                repayments.stream().map(DashboardService::toRepaymentRow).toList());
     }
 
     private static List<ExpenseShare> toShares(List<Expense> expenses) {
@@ -67,16 +74,23 @@ public class DashboardService {
                 .toList();
     }
 
-    private static List<MemberOption> memberOptions(List<Member> members, List<Expense> expenses, long userId) {
+    private static List<MemberOption> memberOptions(List<Member> members, List<Expense> expenses,
+                                                    List<Repayment> repayments, long userId) {
         return members.stream()
                 .map(m -> new MemberOption(m.getId(), m.getName(),
-                        !m.hasAccount() && expenses.stream().noneMatch(e -> e.involves(m)),
+                        !m.hasAccount() && expenses.stream().noneMatch(e -> e.involves(m))
+                                && repayments.stream().noneMatch(r -> r.involves(m)),
                         m.hasAccount(), m.isLinkedTo(userId)))
                 .toList();
     }
 
     private static List<MemberBalance> balances(List<Member> members, List<Expense> expenses,
-                                                Map<Long, BigDecimal> net) {
+                                                List<Transfer> paymentsMade, Map<Long, BigDecimal> net) {
+        Map<Long, BigDecimal> repaid = new HashMap<>();
+        for (Transfer payment : paymentsMade) {
+            repaid.merge(payment.fromId(), payment.amount(), BigDecimal::add);
+            repaid.merge(payment.toId(), payment.amount().negate(), BigDecimal::add);
+        }
         Map<Long, BigDecimal> paid = expenses.stream().collect(Collectors.groupingBy(
                 e -> e.getPaidBy().getId(),
                 Collectors.reducing(BigDecimal.ZERO, Expense::getAmount, BigDecimal::add)));
@@ -88,9 +102,12 @@ public class DashboardService {
         return members.stream()
                 .map(m -> {
                     BigDecimal memberPaid = paid.getOrDefault(m.getId(), BigDecimal.ZERO).setScale(2);
+                    BigDecimal memberRepaid = repaid.getOrDefault(m.getId(), BigDecimal.ZERO).setScale(2);
                     BigDecimal memberNet = net.get(m.getId());
-                    return new MemberBalance(m.getId(), m.getName(), memberPaid,
-                            memberPaid.subtract(memberNet), memberNet, percentOf(memberNet.abs(), largest));
+                    // net = paid - share + repaid, so the share is what's left over
+                    BigDecimal share = memberPaid.add(memberRepaid).subtract(memberNet);
+                    return new MemberBalance(m.getId(), m.getName(), memberPaid, share, memberRepaid,
+                            memberNet, percentOf(memberNet.abs(), largest));
                 })
                 .sorted(Comparator.comparing(MemberBalance::net).reversed())
                 .toList();
@@ -98,7 +115,8 @@ public class DashboardService {
 
     private static List<Payment> settlement(Map<Long, BigDecimal> net, Map<Long, String> names) {
         return SettlementCalculator.settle(net).stream()
-                .map((Transfer t) -> new Payment(names.get(t.fromId()), names.get(t.toId()), t.amount()))
+                .map((Transfer t) -> new Payment(t.fromId(), names.get(t.fromId()), t.toId(), names.get(t.toId()),
+                        t.amount()))
                 .toList();
     }
 
@@ -121,6 +139,11 @@ public class DashboardService {
         return new ExpenseRow(expense.getId(), expense.getDescription(), expense.getAmount(),
                 expense.getCategory(), expense.getDate(), expense.getPaidBy().getName(),
                 expense.getSplitMethod(), shares);
+    }
+
+    private static RepaymentRow toRepaymentRow(Repayment repayment) {
+        return new RepaymentRow(repayment.getId(), repayment.getFrom().getName(), repayment.getTo().getName(),
+                repayment.getAmount(), repayment.getDate(), repayment.getNote());
     }
 
     private static BigDecimal sum(List<BigDecimal> amounts) {

@@ -4,6 +4,7 @@ import com.tally.service.view.ExpenseRow;
 import com.tally.service.view.GroupDashboard;
 import com.tally.service.view.MemberBalance;
 import com.tally.service.view.Payment;
+import com.tally.service.view.RepaymentRow;
 import org.springframework.stereotype.Component;
 
 import java.util.stream.Collectors;
@@ -30,10 +31,20 @@ public class CsvExporter {
 
         csv.append(NEWLINE);
         row(csv, "Balances");
-        row(csv, "Member", "Paid", "Share", "Balance");
+        row(csv, "Member", "Paid", "Share", "Paid back", "Balance");
         for (MemberBalance balance : group.balances()) {
             row(csv, balance.name(), balance.paid().toPlainString(), balance.share().toPlainString(),
-                    balance.net().toPlainString());
+                    balance.repaid().toPlainString(), balance.net().toPlainString());
+        }
+
+        if (group.hasRepayments()) {
+            csv.append(NEWLINE);
+            row(csv, "Payments made");
+            row(csv, "Date", "From", "To", "Amount", "Note");
+            for (RepaymentRow repayment : group.repayments()) {
+                row(csv, repayment.date().toString(), repayment.fromName(), repayment.toName(),
+                        repayment.amount().toPlainString(), repayment.note() == null ? "" : repayment.note());
+            }
         }
 
         csv.append(NEWLINE);

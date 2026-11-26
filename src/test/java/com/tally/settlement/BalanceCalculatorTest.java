@@ -60,6 +60,16 @@ class BalanceCalculatorTest {
         assertThat(balances.get(3L)).isEqualByComparingTo("-45.00");
     }
 
+    @Test
+    void paymentsMadeMoveTheBalancesTowardsZero() {
+        var balances = BalanceCalculator.netBalances(List.of(1L, 2L),
+                List.of(new ExpenseShare(1, new BigDecimal("50.00"), List.of(1L, 2L))),
+                List.of(new Transfer(2, 1, new BigDecimal("20.00"))));
+
+        assertThat(balances.get(1L)).isEqualByComparingTo("5.00");
+        assertThat(balances.get(2L)).isEqualByComparingTo("-5.00");
+    }
+
     private static BigDecimal sum(Map<Long, BigDecimal> balances) {
         return balances.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
     }

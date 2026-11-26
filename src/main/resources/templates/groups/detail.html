@@ -64,7 +64,9 @@
                                   th:text="${b.owed ? 'gets back' : (b.owing ? 'owes' : 'all square')}">gets back</span>
                         </span>
                         <span class="balance__detail muted"
-                              th:text="${'Paid ' + @money.format(b.paid, cur) + ', share ' + @money.format(b.share, cur)}">
+                              th:text="${'Paid ' + @money.format(b.paid, cur) + ', share ' + @money.format(b.share, cur)
+                                    + (b.repaid.signum() > 0 ? ', paid back ' + @money.format(b.repaid, cur)
+                                    : (b.repaid.signum() < 0 ? ', got back ' + @money.format(b.repaid.abs(), cur) : ''))}">
                             Paid €474.00, share €354.00
                         </span>
                     </li>
@@ -130,6 +132,75 @@
                     </li>
                 </ul>
             </section>
+
+            <section class="block" id="payments" aria-labelledby="payments-heading">
+                <div class="section-head">
+                    <h2 id="payments-heading">Payments made</h2>
+                </div>
+                <p class="muted block__hint">When someone pays someone back, record it here (or press “Mark as paid”
+                    on the settle-up plan) and the balances update.</p>
+
+                <ul class="repayments" th:if="${group.hasRepayments()}">
+                    <li class="repayment" th:each="r : ${group.repayments}">
+                        <span class="expense__date">
+                            <span th:text="${#temporals.format(r.date, 'd')}">12</span>
+                            <span th:text="${#temporals.format(r.date, 'MMM')}">Nov</span>
+                        </span>
+                        <span class="repayment__main">
+                            <span class="expense__title" th:text="${r.fromName + ' paid ' + r.toName}">Ben paid Ana</span>
+                            <span class="muted" th:if="${r.note}" th:text="${r.note}">Bank transfer</span>
+                        </span>
+                        <span class="amount" th:text="${@money.format(r.amount, cur)}">€42.10</span>
+                        <form method="post" th:action="@{/groups/{g}/repayments/{r}/delete(g=${group.id},r=${r.id})}"
+                              th:data-confirm="'Delete the payment from ' + ${r.fromName} + ' to ' + ${r.toName} + '?'">
+                            <button class="icon-btn icon-btn--danger" type="submit"
+                                    th:aria-label="'Delete payment from ' + ${r.fromName} + ' to ' + ${r.toName}" title="Delete">
+                                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M8 6V4h4v2M6 6l1 10h6l1-10"/></svg>
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+
+                <details class="record-payment" th:if="${group.members.size() > 1}">
+                    <summary class="btn btn--ghost btn--small">Record a payment</summary>
+                    <form class="record-payment__form" method="post" th:action="@{/groups/{id}/repayments(id=${group.id})}">
+                        <div class="field">
+                            <label for="pay-from">Who paid</label>
+                            <select id="pay-from" name="fromMemberId" required>
+                                <option th:each="m : ${group.members}" th:value="${m.id}" th:text="${m.name}"
+                                        th:selected="${m.you}">Ben</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="pay-to">Paid to</label>
+                            <select id="pay-to" name="toMemberId" required
+                                    th:with="firstOther=${group.members.?[!you][0].id}">
+                                <option th:each="m : ${group.members}" th:value="${m.id}" th:text="${m.name}"
+                                        th:selected="${m.id == firstOther}">Ana</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="pay-amount">Amount</label>
+                            <div class="money-input">
+                                <span class="money-input__symbol" th:text="${@money.symbol(cur)}">€</span>
+                                <input id="pay-amount" name="amount" type="number" min="0.01" step="0.01"
+                                       inputmode="decimal" required placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="pay-date">Date</label>
+                            <input id="pay-date" name="date" type="date" required th:value="${#temporals.format(#temporals.createToday(), 'yyyy-MM-dd')}">
+                        </div>
+                        <div class="field record-payment__note">
+                            <label for="pay-note">Note <span class="optional">optional</span></label>
+                            <input id="pay-note" name="note" type="text" maxlength="120" placeholder="Bank transfer">
+                        </div>
+                        <div class="form__actions">
+                            <button class="btn btn--small" type="submit">Save payment</button>
+                        </div>
+                    </form>
+                </details>
+            </section>
         </div>
 
         <!-- Side column -->
@@ -151,6 +222,13 @@
                             <span th:text="${p.toName}">Ana</span>
                         </span>
                         <mark class="receipt__amount" th:text="${@money.format(p.amount, cur)}">€42.10</mark>
+                        <form class="receipt__paid" method="post" th:action="@{/groups/{id}/repayments(id=${group.id})}">
+                            <input type="hidden" name="fromMemberId" th:value="${p.fromId}">
+                            <input type="hidden" name="toMemberId" th:value="${p.toId}">
+                            <input type="hidden" name="amount" th:value="${p.amount}">
+                            <button class="link-btn" type="submit"
+                                    th:aria-label="'Mark as paid: ' + ${p.fromName} + ' paid ' + ${p.toName}">Mark as paid</button>
+                        </form>
                     </li>
                 </ol>
 

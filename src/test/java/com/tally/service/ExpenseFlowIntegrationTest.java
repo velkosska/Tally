@@ -70,9 +70,9 @@ class ExpenseFlowIntegrationTest {
         GroupDashboard dashboard = dashboardService.dashboard(ana, groupId);
         assertThat(dashboard.totalSpent()).isEqualByComparingTo("360.00");
         assertThat(dashboard.averagePerPerson()).isEqualByComparingTo("120.00");
-        assertThat(dashboard.settlement()).containsExactlyInAnyOrder(
-                new Payment("Carla", "Ana", new BigDecimal("120.00")),
-                new Payment("Ben", "Ana", new BigDecimal("60.00")));
+        assertThat(dashboard.settlement())
+                .extracting(Payment::fromName, Payment::toName, p -> p.amount().toPlainString())
+                .containsExactlyInAnyOrder(tuple("Carla", "Ana", "120.00"), tuple("Ben", "Ana", "60.00"));
     }
 
     @Test
